@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Delphi — Decide What Matters</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden;background:#0a0907;font-family:'Space Grotesk',sans-serif;color:#f0ece6}
+
+/* ── Orb background ── */
+.orb{position:fixed;border-radius:50%;filter:blur(80px);pointer-events:none;z-index:0}
+.orb-a{width:700px;height:700px;background:radial-gradient(circle,rgba(255,85,0,0.18) 0%,transparent 70%);top:-200px;left:50%;transform:translateX(-50%)}
+.orb-b{width:500px;height:500px;background:radial-gradient(circle,rgba(0,212,180,0.10) 0%,transparent 70%);bottom:-100px;left:-100px}
+.orb-c{width:400px;height:400px;background:radial-gradient(circle,rgba(176,64,255,0.09) 0%,transparent 70%);bottom:-50px;right:-80px}
+
+/* Grid overlay */
+.grid{position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:linear-gradient(rgba(42,37,32,0.4) 1px,transparent 1px),linear-gradient(90deg,rgba(42,37,32,0.4) 1px,transparent 1px);
+  background-size:40px 40px}
+
+/* ── Layout ── */
+.root{position:relative;z-index:1;display:flex;height:100vh;width:100vw;overflow:hidden}
+
+/* Left panel */
+.left{width:52%;display:flex;flex-direction:column;justify-content:center;padding:60px 72px;position:relative}
+.right{width:48%;display:flex;flex-direction:column;justify-content:center;padding:60px 60px 60px 40px;border-left:1px solid rgba(42,37,32,0.8);background:rgba(21,18,16,0.6)}
+
+/* Top nav */
+.topnav{position:fixed;top:0;left:0;right:0;z-index:10;display:flex;justify-content:space-between;align-items:center;padding:18px 36px;border-bottom:1px solid rgba(42,37,32,0.7);background:rgba(10,9,7,0.8);backdrop-filter:blur(8px)}
+
+/* Type */
+.eyebrow{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:#5a5450;margin-bottom:18px;display:flex;align-items:center;gap:8px}
+.eyebrow::before{content:'';width:28px;height:1px;background:#ff5500;display:inline-block}
+
+.hero-logo{font-size:72px;font-weight:700;letter-spacing:-0.02em;line-height:1;margin-bottom:10px;background:linear-gradient(135deg,#f0ece6 60%,rgba(240,236,230,0.5));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero-tag{font-size:28px;font-weight:600;color:#ff5500;letter-spacing:-0.01em;margin-bottom:24px}
+.hero-body{font-size:15px;color:#9a9490;line-height:1.75;max-width:480px;margin-bottom:36px}
+.hero-body strong{color:#c8c4be;font-weight:500}
+
+/* Loop */
+.loop{display:flex;align-items:center;gap:0;margin-bottom:44px;flex-wrap:wrap;gap:2px}
+.loop-step{font-family:'Space Mono',monospace;font-size:9px;font-weight:700;letter-spacing:0.08em;padding:5px 9px;border:1px solid rgba(255,85,0,0.2);border-radius:3px;color:#9a9490;transition:all 0.3s}
+.loop-step.active{background:rgba(255,85,0,0.15);border-color:rgba(255,85,0,0.5);color:#ff5500}
+.loop-arrow{font-size:9px;color:#3a3430;margin:0 2px}
+
+/* Capabilities */
+.caps{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:0}
+.cap{padding:14px 16px;background:rgba(21,18,16,0.8);border:1px solid rgba(42,37,32,0.9);border-radius:6px;transition:border-color 0.2s}
+.cap:hover{border-color:rgba(255,85,0,0.3)}
+.cap-icon{font-size:16px;margin-bottom:8px}
+.cap-label{font-size:12px;font-weight:700;margin-bottom:4px;color:#f0ece6}
+.cap-desc{font-size:11px;color:#9a9490;line-height:1.55}
+.cap-pro{font-family:'Space Mono',monospace;font-size:8px;color:#b040ff;margin-top:5px;letter-spacing:0.06em}
+
+/* Auth */
+.auth-card{background:rgba(21,18,16,0.95);border:1px solid rgba(42,37,32,0.9);border-radius:10px;padding:36px}
+.auth-title{font-size:22px;font-weight:700;margin-bottom:6px}
+.auth-sub{font-size:13px;color:#9a9490;margin-bottom:28px;line-height:1.55}
+
+.btn-primary{width:100%;padding:13px 20px;background:#ff5500;color:#fff;border:none;border-radius:5px;font-size:13px;font-weight:700;font-family:'Space Grotesk',sans-serif;letter-spacing:0.04em;cursor:pointer;transition:opacity 0.15s;margin-bottom:12px;text-align:center;display:block;text-decoration:none}
+.btn-primary:hover{opacity:0.88}
+
+.divider{display:flex;align-items:center;gap:12px;margin:16px 0;color:#5a5450;font-size:11px}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:#2a2520}
+
+.btn-oauth{width:100%;padding:11px 20px;background:transparent;border:1px solid #2a2520;border-radius:5px;font-size:12px;font-weight:500;font-family:'Space Grotesk',sans-serif;color:#9a9490;cursor:pointer;transition:all 0.15s;margin-bottom:8px;display:flex;align-items:center;justify-content:center;gap:10px;text-decoration:none}
+.btn-oauth:hover{border-color:#3a3430;color:#f0ece6}
+.btn-oauth:last-child{margin-bottom:0}
+
+.tiers{margin-top:20px;padding-top:18px;border-top:1px solid #1c1915}
+.tier{display:flex;align-items:flex-start;gap:8px;margin-bottom:9px;font-size:11px;color:#9a9490;line-height:1.45}
+.tier-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0;margin-top:4px}
+
+/* Footer */
+.footer-links{display:flex;gap:20px;margin-top:18px;justify-content:center}
+.footer-link{font-size:11px;color:#5a5450;text-decoration:none;cursor:pointer;transition:color 0.15s;font-family:'Space Mono',monospace;letter-spacing:0.04em}
+.footer-link:hover{color:#ff5500}
+
+/* Pulse animation */
+@keyframes pulse-ring{0%{transform:scale(0.9);opacity:0.6}50%{transform:scale(1.05);opacity:0.3}100%{transform:scale(0.9);opacity:0.6}}
+@keyframes loop-cycle{0%,100%{opacity:0.4}50%{opacity:1}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+
+.animate-1{animation:fadeUp 0.5s ease 0.1s both}
+.animate-2{animation:fadeUp 0.5s ease 0.25s both}
+.animate-3{animation:fadeUp 0.5s ease 0.4s both}
+.animate-4{animation:fadeUp 0.5s ease 0.55s both}
+.animate-5{animation:fadeUp 0.5s ease 0.7s both}
+
+.gravity-orb{position:absolute;width:120px;height:120px;border-radius:50%;background:radial-gradient(circle,rgba(255,85,0,0.25) 0%,transparent 70%);top:50px;right:60px;animation:pulse-ring 3s ease-in-out infinite}
+</style>
+</head>
+<body>
+
+<div class="orb orb-a"></div>
+<div class="orb orb-b"></div>
+<div class="orb orb-c"></div>
+<div class="grid"></div>
+
+<!-- Top nav -->
+<div class="topnav">
+  <div style="display:flex;align-items:center;gap:10px">
+    <div style="width:26px;height:26px;background:#ff5500;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff">Δ</div>
+    <span style="font-weight:700;font-size:13px;letter-spacing:0.06em">DELPHI</span>
+    <span style="font-family:'Space Mono',monospace;font-size:9px;color:#5a5450;letter-spacing:0.1em;border:1px solid #2a2520;padding:2px 7px;border-radius:3px">Decision OS v2.0</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:20px">
+    <a href="#" class="footer-link">PRICING</a>
+    <a href="#" class="footer-link">DOCS</a>
+    <a href="Delphi.html" class="footer-link" style="color:#ff5500;border:1px solid rgba(255,85,0,0.4);padding:5px 14px;border-radius:4px">CONTINUE TO DASHBOARD →</a>
+  </div>
+</div>
+
+<div class="root" style="padding-top:58px">
+  <!-- LEFT -->
+  <div class="left">
+    <div class="gravity-orb"></div>
+
+    <div class="eyebrow animate-1">The Decision OS for the agentic economy</div>
+
+    <div class="animate-2">
+      <div class="hero-logo">DELPHI</div>
+      <div class="hero-tag">Decide What Matters.</div>
+    </div>
+
+    <p class="hero-body animate-3">
+      We turn <strong>chaotic decision-making</strong> into a structured, intelligent loop — combining reasoning agents, an Attention Engine, and an Authority Matrix to help teams focus on what truly matters.
+    </p>
+
+    <div class="loop animate-3">
+      <span class="loop-step active">SENSE</span><span class="loop-arrow">→</span>
+      <span class="loop-step">FRAME</span><span class="loop-arrow">→</span>
+      <span class="loop-step">SIMULATE</span><span class="loop-arrow">→</span>
+      <span class="loop-step">JUDGE</span><span class="loop-arrow">→</span>
+      <span class="loop-step">ACT</span><span class="loop-arrow">→</span>
+      <span class="loop-step">OBSERVE</span><span class="loop-arrow">→</span>
+      <span class="loop-step">UPDATE</span>
+    </div>
+
+    <div class="caps animate-4">
+      <div class="cap">
+        <div class="cap-icon">◈</div>
+        <div class="cap-label">Attention Engine</div>
+        <div class="cap-desc">Decision Gravity automatically surfaces what matters most right now.</div>
+      </div>
+      <div class="cap">
+        <div class="cap-icon">⬟</div>
+        <div class="cap-label">Authority Matrix</div>
+        <div class="cap-desc">Routes decisions to the right person at the right time, every time.</div>
+      </div>
+      <div class="cap">
+        <div class="cap-icon">⬡</div>
+        <div class="cap-label">Specialized Agents</div>
+        <div class="cap-desc">Planner, Inversion, Counterfactual, Judge & Meta working in concert.</div>
+      </div>
+      <div class="cap" style="border-color:rgba(176,64,255,0.25)">
+        <div class="cap-icon" style="color:#b040ff">◎</div>
+        <div class="cap-label">System 3 Learning</div>
+        <div class="cap-desc">Reversibility tracking, bias detection, and continuous calibration.</div>
+        <div class="cap-pro">PRO & ENTERPRISE ONLY</div>
+      </div>
+    </div>
+
+    <!-- Footer links -->
+    <div class="footer-links animate-5" style="justify-content:flex-start;margin-top:28px">
+      <a class="footer-link">▶ Watch 39-sec intro</a>
+      <a class="footer-link">How Delphi works</a>
+      <a class="footer-link">View pricing</a>
+    </div>
+  </div>
+
+  <!-- RIGHT: Auth -->
+  <div class="right">
+    <div class="auth-card animate-2">
+      <div class="auth-title">Start deciding better.</div>
+      <div class="auth-sub">Free tier includes the core decision loop and reasoning agents.<br/>No credit card required.</div>
+
+      <a href="Delphi.html" class="btn-primary">Create Free Account →</a>
+
+      <div class="divider">or sign in with</div>
+
+      <a href="Delphi.html" class="btn-oauth">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+        Continue with Google
+      </a>
+      <a href="Delphi.html" class="btn-oauth">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.477 2 12c0 4.418 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.009-.868-.013-1.703-2.782.604-3.369-1.341-3.369-1.341-.454-1.155-1.11-1.463-1.11-1.463-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.268 2.75 1.026A9.578 9.578 0 0112 6.836c.85.004 1.705.114 2.504.336 1.909-1.294 2.747-1.026 2.747-1.026.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.138 20.161 22 16.416 22 12c0-5.523-4.477-10-10-10z"/></svg>
+        Continue with GitHub
+      </a>
+      <a href="Delphi.html" class="btn-oauth">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+        Continue with Email
+      </a>
+
+      <div class="tiers">
+        <div class="tier">
+          <div class="tier-dot" style="background:#00e87a"></div>
+          <span><strong style="color:#f0ece6">Free</strong> — Core decision loop, reasoning agents, Decision Wizard.</span>
+        </div>
+        <div class="tier">
+          <div class="tier-dot" style="background:#ff5500"></div>
+          <span><strong style="color:#f0ece6">PRO</strong> — Structured authority, attention allocation, Decision Theater.</span>
+        </div>
+        <div class="tier">
+          <div class="tier-dot" style="background:#b040ff"></div>
+          <span><strong style="color:#f0ece6">Enterprise</strong> — Full governance, Executive Mission Control, S3 learning.</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="text-align:center;margin-top:16px">
+      <a href="Delphi.html" style="font-family:'Space Mono',monospace;font-size:10px;color:#5a5450;text-decoration:none;letter-spacing:0.08em;cursor:pointer">SKIP → CONTINUE TO DASHBOARD</a>
+    </div>
+  </div>
+</div>
+
+<script>
+// Animate the loop steps cycling
+const steps = document.querySelectorAll('.loop-step');
+let current = 0;
+setInterval(() => {
+  steps.forEach(s => s.classList.remove('active'));
+  steps[current].classList.add('active');
+  current = (current + 1) % steps.length;
+}, 900);
+</script>
+</body>
+</html>

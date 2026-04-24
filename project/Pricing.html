@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Delphi — Pricing</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:#0a0907;color:#f0ece6;font-family:'Space Grotesk',sans-serif;overflow-x:hidden;line-height:1.5}
+::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar-thumb{background:#2a2520;border-radius:2px}
+
+/* tokens */
+:root{
+  --orange:#ff5500;--cyan:#00d4b4;--purple:#b040ff;
+  --amber:#ffaa00;--green:#00e87a;--red:#ff3545;
+  --bg:#0a0907;--card:#151210;--card2:#1c1915;
+  --border:#2a2520;--border2:#3a3430;
+  --t1:#f0ece6;--t2:#9a9490;--t3:#5a5450;
+}
+
+/* grid */
+.grid-bg{position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:linear-gradient(rgba(42,37,32,0.35) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(42,37,32,0.35) 1px,transparent 1px);
+  background-size:40px 40px}
+
+/* nav */
+nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;justify-content:space-between;align-items:center;
+  padding:16px 48px;border-bottom:1px solid var(--border);background:rgba(10,9,7,0.88);backdrop-filter:blur(10px)}
+.nav-logo{display:flex;align-items:center;gap:10px}
+.logo-mark{width:26px;height:26px;background:var(--orange);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff}
+.nav-links{display:flex;align-items:center;gap:22px}
+.nav-link{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:0.1em;color:var(--t3);text-decoration:none;text-transform:uppercase;transition:color 0.15s}
+.nav-link:hover{color:var(--orange)}
+.nav-cta{padding:7px 18px;background:var(--orange);color:#fff;border-radius:4px;font-size:11px;font-weight:700;letter-spacing:0.06em;text-decoration:none;font-family:'Space Mono',monospace;transition:opacity 0.15s}
+.nav-cta:hover{opacity:0.85}
+
+/* layout */
+.page{position:relative;z-index:1;padding-top:58px}
+.inner{max-width:1240px;margin:0 auto;padding:0 48px}
+
+/* eyebrow */
+.eyebrow{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:var(--t3);margin-bottom:14px;display:flex;align-items:center;gap:10px}
+.eyebrow::before{content:'';width:28px;height:1px;background:var(--orange);display:inline-block}
+
+/* ── HERO ── */
+.hero{padding:90px 0 60px;text-align:center;
+  background:radial-gradient(ellipse 70% 50% at 50% 0%,rgba(255,85,0,0.10) 0%,transparent 70%)}
+.hero .eyebrow{justify-content:center}
+.hero h1{font-size:58px;font-weight:700;letter-spacing:-0.02em;line-height:1.05;margin-bottom:16px}
+.hero h1 span{color:var(--orange)}
+.hero-sub{font-size:17px;color:var(--t2);max-width:560px;margin:0 auto 36px;line-height:1.7}
+
+/* ── FOUNDING BANNER ── */
+.founding-banner{position:relative;margin:0 auto 72px;max-width:860px;
+  background:linear-gradient(135deg,rgba(255,85,0,0.12) 0%,rgba(176,64,255,0.08) 100%);
+  border:1px solid rgba(255,85,0,0.35);border-radius:10px;padding:32px 40px;
+  overflow:hidden}
+.founding-banner::before{content:'';position:absolute;top:-40px;right:-40px;width:200px;height:200px;
+  border-radius:50%;background:radial-gradient(circle,rgba(255,85,0,0.15),transparent 70%);pointer-events:none}
+.founding-label{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:0.14em;
+  color:var(--orange);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.founding-label::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--orange);animation:blink 1.4s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
+.founding-banner h2{font-size:26px;font-weight:700;margin-bottom:8px}
+.founding-banner p{font-size:14px;color:var(--t2);max-width:560px;line-height:1.65;margin-bottom:22px}
+.founding-price{display:inline-flex;align-items:baseline;gap:6px;margin-bottom:20px}
+.founding-amount{font-family:'Space Mono',monospace;font-size:52px;font-weight:700;color:var(--orange);line-height:1}
+.founding-period{font-size:16px;color:var(--t2)}
+.founding-note{font-size:12px;color:var(--t3);margin-bottom:24px}
+.spots-counter{display:inline-flex;align-items:center;gap:10px;padding:7px 16px;
+  background:rgba(255,85,0,0.12);border:1px solid rgba(255,85,0,0.3);border-radius:4px;
+  font-family:'Space Mono',monospace;font-size:11px;color:var(--orange);margin-bottom:24px}
+.spots-bar{height:4px;background:rgba(255,85,0,0.2);border-radius:2px;width:180px;margin-bottom:6px;overflow:hidden}
+.spots-fill{height:100%;border-radius:2px;background:var(--orange);width:0%}
+.btn-founding{display:inline-block;padding:13px 28px;background:var(--orange);color:#fff;border-radius:5px;
+  font-size:13px;font-weight:700;letter-spacing:0.04em;text-decoration:none;transition:opacity 0.15s;font-family:'Space Grotesk',sans-serif}
+.btn-founding:hover{opacity:0.85}
+
+/* ── BILLING TOGGLE ── */
+.billing-toggle{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:48px}
+.toggle-label{font-size:13px;color:var(--t2)}
+.toggle-switch{position:relative;width:44px;height:24px;cursor:pointer}
+.toggle-switch input{opacity:0;width:0;height:0}
+.toggle-track{position:absolute;inset:0;background:var(--border2);border-radius:12px;transition:background 0.2s}
+.toggle-thumb{position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform 0.2s}
+input:checked ~ .toggle-track{background:var(--orange)}
+input:checked ~ .toggle-thumb{transform:translateX(20px)}
+.toggle-badge{padding:3px 9px;background:rgba(0,232,122,0.15);border:1px solid rgba(0,232,122,0.3);
+  border-radius:3px;font-family:'Space Mono',monospace;font-size:9px;color:var(--green);letter-spacing:0.08em}
+
+/* ── TIERS ── */
+.tiers-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:16px;margin-bottom:60px;align-items:start}
+
+.tier-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:28px 22px;
+  position:relative;overflow:hidden;display:flex;flex-direction:column;transition:border-color 0.2s}
+.tier-card:hover{border-color:var(--border2)}
+.tier-card.featured{border-color:rgba(255,85,0,0.5);background:linear-gradient(160deg,rgba(255,85,0,0.07) 0%,var(--card) 60%)}
+.tier-card.founding{border-color:rgba(255,85,0,0.6);background:linear-gradient(160deg,rgba(255,85,0,0.10) 0%,rgba(176,64,255,0.04) 100%)}
+
+.tier-top-bar{position:absolute;top:0;left:0;right:0;height:2px}
+.tier-badge{font-family:'Space Mono',monospace;font-size:8px;letter-spacing:0.12em;
+  padding:3px 8px;border-radius:3px;border:1px solid;display:inline-flex;
+  align-items:center;gap:5px;margin-bottom:16px}
+.tier-name{font-size:17px;font-weight:700;margin-bottom:3px}
+.tier-who{font-size:11px;color:var(--t3);margin-bottom:20px;line-height:1.4;min-height:32px}
+.tier-price{margin-bottom:6px}
+.price-amount{font-family:'Space Mono',monospace;font-size:34px;font-weight:700;line-height:1}
+.price-period{font-size:12px;color:var(--t2);margin-left:4px}
+.price-annual{font-size:10px;color:var(--t3);margin-bottom:20px;min-height:16px;font-family:'Space Mono',monospace}
+.tier-cta{display:block;text-align:center;padding:10px 16px;border-radius:5px;font-size:12px;
+  font-weight:700;letter-spacing:0.04em;text-decoration:none;margin-bottom:24px;transition:all 0.15s;
+  font-family:'Space Grotesk',sans-serif;cursor:pointer;border:none}
+.cta-primary{background:var(--orange);color:#fff}
+.cta-primary:hover{opacity:0.85}
+.cta-outline{background:transparent;color:var(--t2);border:1px solid var(--border2) !important;border-radius:5px}
+.cta-outline:hover{border-color:var(--t2) !important;color:var(--t1)}
+.cta-ghost{background:transparent;color:var(--t3);border:1px solid var(--border) !important;border-radius:5px}
+.cta-ghost:hover{border-color:var(--border2) !important;color:var(--t2)}
+
+.feature-list{list-style:none;display:flex;flex-direction:column;gap:9px;flex:1}
+.feature-list li{display:flex;align-items:flex-start;gap:8px;font-size:12px;color:var(--t2);line-height:1.45}
+.f-check{flex-shrink:0;font-size:11px;margin-top:1px}
+.f-yes{color:var(--green)}
+.f-partial{color:var(--amber)}
+.f-no{color:var(--border2)}
+
+/* ── COMPARISON TABLE ── */
+.comparison{margin-bottom:80px}
+.comparison-title{font-size:28px;font-weight:700;margin-bottom:4px;text-align:center}
+.comparison-sub{font-size:14px;color:var(--t2);text-align:center;margin-bottom:36px}
+.table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:10px;background:var(--card)}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead th{padding:16px 20px;text-align:left;font-weight:700;font-size:10px;letter-spacing:0.08em;
+  text-transform:uppercase;color:var(--t3);font-family:'Space Mono',monospace;
+  border-bottom:1px solid var(--border);white-space:nowrap}
+thead th:first-child{color:var(--t2);font-size:11px}
+thead th.th-featured{color:var(--orange)}
+thead th.th-founding{color:var(--orange)}
+tbody tr{border-bottom:1px solid var(--border)}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover td{background:rgba(42,37,32,0.5)}
+td{padding:13px 20px;vertical-align:middle;color:var(--t2)}
+td:first-child{color:var(--t1);font-weight:500;font-size:12px}
+td.td-feat{color:var(--t3);font-size:11px}
+.row-group td{background:rgba(21,18,16,0.8);font-size:9px;font-weight:700;letter-spacing:0.1em;
+  text-transform:uppercase;color:var(--t3);font-family:'Space Mono',monospace;padding:8px 20px}
+.check-y{color:var(--green);font-size:13px}
+.check-p{color:var(--amber);font-size:11px}
+.check-n{color:var(--border2);font-size:13px}
+
+/* ── RATIONALE ── */
+.rationale{display:grid;grid-template-columns:repeat(5,1fr);gap:20px;margin-bottom:80px}
+.rat-card{padding:24px;background:var(--card);border:1px solid var(--border);border-radius:8px;border-top:2px solid}
+.rat-tier{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:0.12em;margin-bottom:8px;font-weight:700}
+.rat-headline{font-size:14px;font-weight:700;margin-bottom:8px}
+.rat-body{font-size:12px;color:var(--t2);line-height:1.6}
+
+/* ── FAQ ── */
+.faq{max-width:780px;margin:0 auto 80px}
+.faq-title{font-size:28px;font-weight:700;text-align:center;margin-bottom:8px}
+.faq-sub{font-size:14px;color:var(--t2);text-align:center;margin-bottom:40px}
+.faq-item{border-bottom:1px solid var(--border);padding:20px 0;cursor:pointer}
+.faq-q{display:flex;justify-content:space-between;align-items:center;gap:16px}
+.faq-q-text{font-size:15px;font-weight:600}
+.faq-toggle{font-size:18px;color:var(--orange);flex-shrink:0;transition:transform 0.2s;line-height:1}
+.faq-item.open .faq-toggle{transform:rotate(45deg)}
+.faq-a{font-size:13px;color:var(--t2);line-height:1.7;max-height:0;overflow:hidden;transition:max-height 0.3s ease,padding 0.3s}
+.faq-item.open .faq-a{max-height:200px;padding-top:12px}
+
+/* ── CTA ── */
+.cta-section{text-align:center;padding:80px 0 120px;
+  background:radial-gradient(ellipse 60% 80% at 50% 100%,rgba(255,85,0,0.08) 0%,transparent 70%)}
+.cta-section h2{font-size:44px;font-weight:700;letter-spacing:-0.02em;margin-bottom:14px}
+.cta-section h2 span{color:var(--orange)}
+.cta-section p{font-size:16px;color:var(--t2);max-width:480px;margin:0 auto 36px;line-height:1.7}
+.cta-row{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.btn-lg{padding:14px 32px;border-radius:5px;font-size:13px;font-weight:700;letter-spacing:0.04em;
+  text-decoration:none;font-family:'Space Grotesk',sans-serif;transition:all 0.15s;display:inline-block}
+.btn-lg-primary{background:var(--orange);color:#fff}
+.btn-lg-primary:hover{opacity:0.85}
+.btn-lg-ghost{background:transparent;color:var(--t2);border:1px solid var(--border2)}
+.btn-lg-ghost:hover{border-color:var(--t2);color:var(--t1)}
+
+/* divider */
+hr.div{border:none;border-top:1px solid var(--border);margin:0 auto;max-width:1240px}
+</style>
+</head>
+<body>
+<div class="grid-bg"></div>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">
+    <div class="logo-mark">Δ</div>
+    <span style="font-weight:700;font-size:13px;letter-spacing:0.06em">DELPHI</span>
+    <span style="font-family:'Space Mono',monospace;font-size:9px;color:var(--t3);border:1px solid var(--border);padding:2px 7px;border-radius:3px">Decision OS v2.0</span>
+  </div>
+  <div class="nav-links">
+    <a href="Welcome.html" class="nav-link">Welcome</a>
+    <a href="How-Delphi-Works.html" class="nav-link">How It Works</a>
+    <a href="#" class="nav-link" style="color:var(--orange)">Pricing</a>
+    <a href="Delphi.html" class="nav-cta">Open Platform →</a>
+  </div>
+</nav>
+
+<div class="page">
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="inner">
+      <div class="eyebrow">Pricing</div>
+      <h1>Decide What Matters.<br/><span>Pay for what you use.</span></h1>
+      <p class="hero-sub">Premium infrastructure for the agentic era. From the core judgment loop to full organizational governance — choose the depth of control you need.</p>
+    </div>
+  </section>
+
+  <div class="inner">
+
+    <!-- FOUNDING BANNER -->
+    <div class="founding-banner">
+      <div class="founding-label">LIMITED OFFER · 50 SPOTS ONLY</div>
+      <h2>Founding Member Access</h2>
+      <p>Lock in early access at a special rate for the first believers. Includes Founding Member badge, direct roadmap input, priority support, and unlimited Decision Theater.</p>
+      <div class="founding-price">
+        <span class="founding-amount">$99</span>
+        <span class="founding-period">/ month for first 2 years</span>
+      </div>
+      <div class="founding-note">Then automatically converts to <strong style="color:var(--t1)">30% off</strong> the prevailing rate — forever.</div>
+      <div>
+        <div class="spots-counter">
+          <span>50 of 50 spots remaining</span>
+        </div>
+        <div class="spots-bar"><div class="spots-fill" id="spotsBar"></div></div>
+        <div style="font-size:10px;color:var(--t3);font-family:'Space Mono',monospace;margin-bottom:20px">0% claimed — be the first</div>
+      </div>
+      <a href="Delphi.html" class="btn-founding">Claim Your Founding Member Spot →</a>
+    </div>
+
+    <!-- BILLING TOGGLE -->
+    <div class="billing-toggle">
+      <span class="toggle-label" id="monthLabel" style="color:var(--t1)">Monthly</span>
+      <label class="toggle-switch">
+        <input type="checkbox" id="billingToggle"/>
+        <div class="toggle-track"></div>
+        <div class="toggle-thumb"></div>
+      </label>
+      <span class="toggle-label" id="annualLabel">Annual</span>
+      <span class="toggle-badge">SAVE 20%</span>
+    </div>
+
+    <!-- TIER CARDS -->
+    <div class="tiers-grid" id="tiersGrid"></div>
+
+    <hr class="div" style="margin-bottom:80px"/>
+
+    <!-- COMPARISON TABLE -->
+    <div class="comparison">
+      <div class="comparison-title">Full Feature Comparison</div>
+      <p class="comparison-sub">Every capability, every tier. No surprises.</p>
+      <div class="table-wrap">
+        <table id="compTable"></table>
+      </div>
+    </div>
+
+    <hr class="div" style="margin-bottom:80px"/>
+
+    <!-- RATIONALE -->
+    <div style="text-align:center;margin-bottom:32px">
+      <div class="eyebrow" style="justify-content:center">Why the upgrade path exists</div>
+      <div style="font-size:28px;font-weight:700;margin-bottom:8px">Built for Depth, Not Breadth</div>
+      <p style="font-size:14px;color:var(--t2);max-width:560px;margin:0 auto">This pricing reflects Delphi's position as premium decision infrastructure — focused on judgment quality, attention allocation, and governed outcomes.</p>
+    </div>
+    <div class="rationale" id="rationaleGrid"></div>
+
+    <hr class="div" style="margin-bottom:80px"/>
+
+    <!-- FAQ -->
+    <div class="faq">
+      <div class="faq-title">Frequently Asked Questions</div>
+      <p class="faq-sub">Everything you need to know about Delphi's plans.</p>
+      <div id="faqList"></div>
+    </div>
+
+  </div><!-- /inner -->
+
+  <!-- CTA -->
+  <section class="cta-section">
+    <div class="inner">
+      <h2>Ready to structure<br/><span>your judgment?</span></h2>
+      <p>Start free, no card required. Upgrade when you need depth.</p>
+      <div class="cta-row">
+        <a href="Delphi.html" class="btn-lg btn-lg-primary">Get Started Free →</a>
+        <a href="#" class="btn-lg btn-lg-ghost">Claim Founding Spot</a>
+        <a href="Delphi.html" class="btn-lg btn-lg-ghost">Book a Demo</a>
+      </div>
+    </div>
+  </section>
+
+</div><!-- /page -->
+
+<script>
+// ── DATA ─────────────────────────────────────────────────────────────────
+const TIERS = [
+  { id:'explorer', name:'Explorer', who:'Curiosity & light testing',
+    color:'#5a5450', featured:false, founding:false,
+    monthly:'Free', annual:'Free', annualNote:'',
+    cta:'Get Started Free', ctaClass:'cta-ghost', ctaHref:'Delphi.html',
+    features:[
+      '10 decisions / month',
+      'Basic reasoning agents (limited)',
+      'Decision Theater (single-user, limited)',
+      'Basic decision logging',
+      'Community forum + docs',
+      'Cloud sandbox only',
+      'Basic API access',
+    ],
+    featureStatus:['partial','partial','partial','partial','yes','no','partial'],
+  },
+  { id:'founding', name:'Founding Member', who:'Early believers & solo operators',
+    color:'#ff5500', featured:false, founding:true,
+    monthly:'$99', annual:'$99', annualNote:'For first 2 years, then 30% off forever',
+    cta:'Claim Spot — 50 Only', ctaClass:'cta-primary', ctaHref:'Delphi.html',
+    features:[
+      'Unlimited decisions (fair use)',
+      'All 6 reasoning agents, unlimited',
+      'Full Decision Theater, unlimited',
+      'Basic Attention Engine (Gravity)',
+      'Limited Decision Authority Matrix',
+      'Basic Operator Mission Control',
+      'Priority email + Slack support',
+    ],
+    featureStatus:['yes','yes','yes','partial','partial','partial','yes'],
+  },
+  { id:'starter', name:'Starter', who:'Solo operators & small teams',
+    color:'#00d4b4', featured:false, founding:false,
+    monthly:'$79', annual:'$750', annualNote:'$750/yr saves $198',
+    cta:'Start Starter', ctaClass:'cta-outline', ctaHref:'Delphi.html',
+    features:[
+      'Unlimited decisions (fair use)',
+      'All 6 reasoning agents, advanced config',
+      'Full Decision Theater (single-user)',
+      'Basic Attention Engine (Gravity)',
+      'Limited Decision Authority Matrix',
+      'Basic Operator Mission Control',
+      'Email support',
+    ],
+    featureStatus:['yes','yes','yes','partial','partial','partial','partial'],
+  },
+  { id:'pro', name:'PRO', who:'Growing teams & operators',
+    color:'#ff5500', featured:true, founding:false,
+    monthly:'$4,800', annual:'$45,000', annualNote:'$45,000/yr saves $12,600',
+    cta:'Start PRO', ctaClass:'cta-primary', ctaHref:'Delphi.html',
+    features:[
+      'Unlimited decisions',
+      'All agents + advanced configurations',
+      'Full Decision Theater + team workspaces',
+      'Full Attention Engine + custom gravity',
+      'Full Decision Authority Matrix',
+      'Full Operator Mission Control',
+      'Priority email + Slack',
+    ],
+    featureStatus:['yes','yes','yes','yes','yes','yes','yes'],
+  },
+  { id:'enterprise', name:'Enterprise', who:'Organizations, enterprises, defense',
+    color:'#b040ff', featured:false, founding:false,
+    monthly:'Custom', annual:'Custom', annualNote:'From $18,000/month',
+    cta:'Book a Demo', ctaClass:'cta-outline', ctaHref:'Delphi.html',
+    features:[
+      'Unlimited + priority compute',
+      'Custom agent development',
+      'Unlimited history & versions',
+      'Full Attention Engine + custom rules',
+      'Full DAM + org mapping',
+      'Executive Mission Control',
+      'Dedicated account manager + SLA',
+    ],
+    featureStatus:['yes','yes','yes','yes','yes','yes','yes'],
+  },
+];
+
+const TABLE_ROWS = [
+  { group:'Core Capabilities' },
+  { feature:'Core Decision Loop', cells:['10 decisions/mo','Unlimited (fair use)','Unlimited (fair use)','Unlimited','Unlimited + priority'] },
+  { feature:'Reasoning Agents', cells:['Basic (limited)','All 6, unlimited','All 6, advanced','All 6, advanced','Custom development'] },
+  { feature:'Decision Theater', cells:['Limited, single-user','Unlimited','Full, single-user','Full + team workspaces','Unlimited + versions'] },
+  { feature:'Decision Wizard', cells:['✓','✓','✓','✓','✓'] },
+  { group:'Intelligence Layer' },
+  { feature:'Attention Engine (Gravity)', cells:['—','Basic','Basic','Full','Full + custom rules'] },
+  { feature:'Decision Authority Matrix', cells:['—','Limited','Limited','Full','Full + org mapping'] },
+  { feature:'Workspace (Human + AI Collab)', cells:['—','—','—','✓','✓'] },
+  { group:'Mission Control' },
+  { feature:'Operator Mission Control', cells:['—','Basic','Basic','Full','Full + custom views'] },
+  { feature:'Executive Mission Control', cells:['—','—','—','—','Full'] },
+  { feature:'Command Center (OMC/EMC/GK)', cells:['—','—','—','—','Full'] },
+  { group:'Governance & Learning' },
+  { feature:'Governance Kernel (System 3)', cells:['Basic logging','—','—','—','Full System 3'] },
+  { feature:'Reversibility Debt Tracking', cells:['—','—','—','—','✓'] },
+  { feature:'Bias Detection & Calibration', cells:['—','—','—','—','✓'] },
+  { feature:'Policy Simulation Lab', cells:['—','—','—','—','✓'] },
+  { group:'Platform & Support' },
+  { feature:'Collaboration', cells:['Single-user','Single-user','Single-user','Team + shared workspaces','RBAC, audit, SSO'] },
+  { feature:'Deployment', cells:['Cloud sandbox','Cloud + self-hosted','Cloud + self-hosted','Cloud + self-hosted','Air-gapped, on-prem'] },
+  { feature:'Integrations', cells:['Basic API','Standard','Standard','Standard','Custom + enterprise'] },
+  { feature:'Support', cells:['Community + docs','Priority email + Slack','Email','Priority email + Slack','Dedicated AM + SLA'] },
+];
+
+const RATIONALE = [
+  { tier:'Explorer (Free)', color:'#5a5450', headline:'A taste, not a tool.',
+    body:'A strictly limited entry into the core judgment loop — designed for discovery. Not for production use.' },
+  { tier:'Founding Member', color:'#ff5500', headline:'Lock in early. Stay locked in.',
+    body:'$99/mo for the first 2 years. For early believers who want direct input on where Delphi goes next.' },
+  { tier:'Starter', color:'#00d4b4', headline:'Serious, unlimited, solo.',
+    body:'The practical entry point — unlimited decisions, all agents, and basic attention capabilities.' },
+  { tier:'PRO', color:'#ff5500', headline:'Full attention, full authority.',
+    body:'Unlocks the Attention Engine, full DAM, and Operator Mission Control for high-confidence decisions at scale.' },
+  { tier:'Enterprise', color:'#b040ff', headline:'Governance at organizational scale.',
+    body:'The complete system: Executive Mission Control, System 3 Kernel, and production-grade governance controls.' },
+];
+
+const FAQS = [
+  { q:"What happens after the 2-year Founding Member period?",
+    a:"Your rate automatically converts to 30% off the then-current Starter or PRO rate. You keep the Founding Member badge, direct roadmap input, and priority support — forever." },
+  { q:"Can I upgrade from Explorer or Founding Member easily?",
+    a:"Yes — all your decisions, reasoning scenarios, agents, and full decision history carry over seamlessly. No data migration needed." },
+  { q:"Do you offer free trials of paid tiers?",
+    a:"Yes. Explorer users get a 14-day trial of Starter features automatically. Contact us to arrange a POC on PRO or Enterprise." },
+  { q:"Is self-hosting available?",
+    a:"Basic self-hosting is available on Founding Member and Starter tiers. Full self-hosted, air-gapped, and on-prem deployments are available on PRO and Enterprise." },
+  { q:"What if my needs change?",
+    a:"You can upgrade or downgrade at any time. Prorated credits apply when upgrading mid-cycle. Contact us for custom Enterprise configurations or pilots." },
+  { q:"Is annual billing required?",
+    a:"No — all tiers are available monthly. Annual billing saves 20% on Starter, PRO, and Enterprise. Founding Member is always billed monthly during the initial 2-year period." },
+];
+
+// ── RENDER TIERS ──────────────────────────────────────────────────────────
+let isAnnual = false;
+const tiersGrid = document.getElementById('tiersGrid');
+
+function renderTiers() {
+  tiersGrid.innerHTML = '';
+  TIERS.forEach(t => {
+    const price = isAnnual ? t.annual : t.monthly;
+    const note  = isAnnual ? t.annualNote : '';
+    const isPaid = price !== 'Free' && price !== 'Custom';
+    const displayPrice = isPaid ? price : price;
+
+    const card = document.createElement('div');
+    card.className = 'tier-card' + (t.featured?' featured':'') + (t.founding?' founding':'');
+    card.innerHTML = `
+      <div class="tier-top-bar" style="background:${t.color}"></div>
+      ${t.featured?'<div style="position:absolute;top:14px;right:14px;font-family:\'Space Mono\',monospace;font-size:8px;letter-spacing:0.12em;padding:3px 8px;border-radius:3px;background:rgba(255,85,0,0.2);border:1px solid rgba(255,85,0,0.4);color:var(--orange)">MOST POPULAR</div>':''}
+      ${t.founding?'<div style="position:absolute;top:14px;right:14px;font-family:\'Space Mono\',monospace;font-size:8px;letter-spacing:0.12em;padding:3px 8px;border-radius:3px;background:rgba(255,85,0,0.15);border:1px solid rgba(255,85,0,0.4);color:var(--orange)">LIMITED · 50 SPOTS</div>':''}
+      <div class="tier-badge" style="color:${t.color};border-color:${t.color}44;background:${t.color}10">
+        <span style="width:5px;height:5px;border-radius:50%;background:${t.color};display:inline-block"></span>
+        ${t.id.toUpperCase()}
+      </div>
+      <div class="tier-name">${t.name}</div>
+      <div class="tier-who">${t.who}</div>
+      <div class="tier-price">
+        <span class="price-amount" style="color:${t.color}">${displayPrice}</span>
+        ${isPaid?`<span class="price-period">/mo</span>`:''}
+      </div>
+      <div class="price-annual">${note || (t.monthly==='Free'?'Free forever':t.monthly==='Custom'?'Contact for pricing':'')}</div>
+      <a href="${t.ctaHref}" class="tier-cta ${t.ctaClass}">${t.cta}</a>
+      <ul class="feature-list">
+        ${t.features.map((f,i)=>`
+          <li>
+            <span class="f-check ${t.featureStatus[i]==='yes'?'f-yes':t.featureStatus[i]==='partial'?'f-partial':'f-no'}">
+              ${t.featureStatus[i]==='yes'?'✓':t.featureStatus[i]==='partial'?'◐':'—'}
+            </span>
+            <span>${f}</span>
+          </li>`).join('')}
+      </ul>
+    `;
+    tiersGrid.appendChild(card);
+  });
+}
+renderTiers();
+
+// billing toggle
+document.getElementById('billingToggle').addEventListener('change', function() {
+  isAnnual = this.checked;
+  document.getElementById('monthLabel').style.color = isAnnual ? 'var(--t2)' : 'var(--t1)';
+  document.getElementById('annualLabel').style.color = isAnnual ? 'var(--t1)' : 'var(--t2)';
+  renderTiers();
+});
+
+// ── COMPARISON TABLE ──────────────────────────────────────────────────────
+const compTable = document.getElementById('compTable');
+compTable.innerHTML = `
+  <thead>
+    <tr>
+      <th style="width:220px">Feature</th>
+      <th>Explorer</th>
+      <th class="th-founding">Founding</th>
+      <th>Starter</th>
+      <th class="th-featured">PRO</th>
+      <th>Enterprise</th>
+    </tr>
+  </thead>
+  <tbody>
+    ${TABLE_ROWS.map(r => r.group
+      ? `<tr class="row-group"><td colspan="6">${r.group}</td></tr>`
+      : `<tr>
+          <td class="td-feat">${r.feature}</td>
+          ${r.cells.map((c,i) => {
+            const isCheck = c==='✓';
+            const isDash  = c==='—';
+            return `<td style="${i===3?'color:var(--t1);font-weight:600':''}">${
+              isCheck ? '<span class="check-y">✓</span>' :
+              isDash  ? '<span class="check-n">—</span>' : c
+            }</td>`;
+          }).join('')}
+        </tr>`
+    ).join('')}
+  </tbody>`;
+
+// ── RATIONALE ─────────────────────────────────────────────────────────────
+const rationaleGrid = document.getElementById('rationaleGrid');
+RATIONALE.forEach(r => {
+  rationaleGrid.innerHTML += `
+    <div class="rat-card" style="border-top-color:${r.color}">
+      <div class="rat-tier" style="color:${r.color}">${r.tier}</div>
+      <div class="rat-headline">${r.headline}</div>
+      <div class="rat-body">${r.body}</div>
+    </div>`;
+});
+
+// ── FAQ ───────────────────────────────────────────────────────────────────
+const faqList = document.getElementById('faqList');
+FAQS.forEach((f,i) => {
+  const item = document.createElement('div');
+  item.className = 'faq-item';
+  item.innerHTML = `
+    <div class="faq-q">
+      <div class="faq-q-text">${f.q}</div>
+      <div class="faq-toggle">+</div>
+    </div>
+    <div class="faq-a">${f.a}</div>`;
+  item.querySelector('.faq-q').addEventListener('click', () => {
+    const wasOpen = item.classList.contains('open');
+    document.querySelectorAll('.faq-item').forEach(el => el.classList.remove('open'));
+    if(!wasOpen) item.classList.add('open');
+  });
+  faqList.appendChild(item);
+});
+
+// animate spots bar after load
+setTimeout(()=>{
+  document.getElementById('spotsBar').style.width='2%';
+  document.getElementById('spotsBar').style.transition='width 1.2s ease';
+},400);
+</script>
+</body>
+</html>

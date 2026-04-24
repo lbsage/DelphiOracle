@@ -1,0 +1,2771 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Delphi — Decision Intelligence Platform</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet"/>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;background:#0e0c0b;color:#f0ece6;font-family:'Space Grotesk',sans-serif;font-size:13px;line-height:1.5;overflow:hidden}
+#root{width:100%;height:100%;display:flex}
+::-webkit-scrollbar{width:3px;height:3px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#2c2820;border-radius:2px}
+button,input{font-family:inherit;outline:none}
+input[type=range]{cursor:pointer;-webkit-appearance:none;appearance:none;background:transparent}
+input[type=range]::-webkit-slider-runnable-track{height:3px;background:#2c2820;border-radius:2px}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:currentColor;margin-top:-4.5px;cursor:pointer}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+// ── DESIGN TOKENS ──────────────────────────────────────────────────────────
+const C = {
+  bg:       '#0e0c0b',
+  card:     '#151210',
+  card2:    '#1c1915',
+  card3:    '#232018',
+  border:   '#2a2520',
+  border2:  '#3a3430',
+  orange:   '#ff5500',
+  cyan:     '#00d4b4',
+  purple:   '#b040ff',
+  text1:    '#f0ece6',
+  text2:    '#9a9490',
+  text3:    '#5a5450',
+  green:    '#00e87a',
+  amber:    '#ffaa00',
+  red:      '#ff3545',
+};
+const mono = { fontFamily: "'Space Mono', monospace" };
+
+// ── PRIMITIVES ─────────────────────────────────────────────────────────────
+const Badge = ({ children, color = C.text3 }) => (
+  <span style={{
+    display:'inline-flex',alignItems:'center',padding:'2px 7px',
+    borderRadius:3,fontSize:9,fontWeight:700,letterSpacing:'0.1em',
+    textTransform:'uppercase',border:`1px solid ${color}44`,
+    color,background:`${color}14`,...mono,lineHeight:'16px'
+  }}>{children}</span>
+);
+
+const Dot = ({ color, pulse }) => (
+  <span style={{
+    width:6,height:6,borderRadius:'50%',background:color,display:'inline-block',
+    flexShrink:0,boxShadow:pulse?`0 0 0 3px ${color}30`:undefined
+  }}/>
+);
+
+const Card = ({ children, style, onClick }) => {
+  const [hov, setHov] = useState(false);
+  return (
+    <div onClick={onClick}
+      onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)}
+      style={{background:C.card,border:`1px solid ${hov&&onClick?C.border2:C.border}`,
+        borderRadius:6,padding:14,cursor:onClick?'pointer':'default',
+        transition:'border-color 0.12s',...style}}>
+      {children}
+    </div>
+  );
+};
+
+const SLabel = ({ children, right }) => (
+  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+    <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.12em',textTransform:'uppercase',color:C.text3,...mono}}>{children}</span>
+    {right}
+  </div>
+);
+
+const Bar = ({ value, color = C.cyan, h = 4, style }) => (
+  <div style={{background:C.border,borderRadius:2,height:h,overflow:'hidden',...style}}>
+    <div style={{width:`${Math.min(100,value)}%`,height:'100%',background:color,borderRadius:2,transition:'width 0.4s ease'}}/>
+  </div>
+);
+
+const Btn = ({ children, onClick, primary, sm, style, full }) => (
+  <button onClick={onClick} style={{
+    background: primary ? C.orange : 'transparent',
+    color: primary ? '#fff' : C.text2,
+    border:`1px solid ${primary?C.orange:C.border2}`,
+    borderRadius:4,padding:sm?'4px 11px':'7px 14px',
+    fontSize:sm?10:11,fontWeight:700,letterSpacing:'0.07em',
+    textTransform:'uppercase',cursor:'pointer',transition:'opacity 0.12s',
+    width:full?'100%':undefined,...mono,...style
+  }}>{children}</button>
+);
+
+const MiniChart = ({ points, color, height=50, fill }) => {
+  const w=220, h=height, pad=4;
+  const min=Math.min(...points), max=Math.max(...points), range=max-min||1;
+  const pts=points.map((v,i)=>`${pad+i*(w-pad*2)/(points.length-1)},${h-pad-(v-min)/range*(h-pad*2)}`).join(' ');
+  return (
+    <svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none">
+      {fill && <defs>
+        <linearGradient id={`g${color.replace('#','')}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.25"/>
+          <stop offset="100%" stopColor={color} stopOpacity="0"/>
+        </linearGradient>
+      </defs>}
+      {fill && <polygon points={`${pts} ${pad+(points.length-1)*(w-pad*2)/(points.length-1)},${h} ${pad},${h}`}
+        fill={`url(#g${color.replace('#','')})`}/>}
+      <polyline points={pts} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round"/>
+    </svg>
+  );
+};
+
+// ── SIDEBAR ────────────────────────────────────────────────────────────────
+const NAV = [
+  {id:'wizard',   label:'Decision Wizard',    icon:'◇'},
+  {id:'command',  label:'Command Center',     icon:'⊕'},
+  {id:'mission',  label:'Mission Control',   icon:'◈'},
+  {id:'theater',  label:'Decision Theater',  icon:'⬡'},
+  {id:'log',      label:'Decision Log',      icon:'≡'},
+  {id:'intel',    label:'Intelligence',      icon:'◎'},
+  {id:'govern',   label:'Governance',        icon:'⬟'},
+  {id:'workspace',label:'Workspace',          icon:'⬢'},
+];
+
+const Sidebar = ({ active, onNav }) => (
+  <div style={{width:210,flexShrink:0,background:C.card,borderRight:`1px solid ${C.border}`,
+    display:'flex',flexDirection:'column',height:'100%'}}>
+    <div style={{padding:'18px 18px 14px',borderBottom:`1px solid ${C.border}`}}>
+      <div style={{display:'flex',alignItems:'center',gap:10}}>
+        <div style={{width:28,height:28,background:C.orange,borderRadius:6,display:'flex',
+          alignItems:'center',justifyContent:'center',fontSize:15,fontWeight:700,color:'#fff',flexShrink:0}}>Δ</div>
+        <div>
+          <div style={{fontWeight:700,fontSize:13,letterSpacing:'0.06em'}}>DELPHI</div>
+          <div style={{fontSize:9,color:C.text3,letterSpacing:'0.12em',textTransform:'uppercase',...mono}}>Decision OS v2.0</div>
+        </div>
+      </div>
+    </div>
+
+    <div style={{padding:'10px 14px',borderBottom:`1px solid ${C.border}`}}>
+      <div style={{fontSize:9,color:C.text3,letterSpacing:'0.1em',textTransform:'uppercase',marginBottom:3,...mono}}>Operator</div>
+      <div style={{fontWeight:600,fontSize:12,marginBottom:1}}>ANALYST_D1</div>
+      <div style={{fontSize:10,color:C.cyan,...mono}}>Level 5 Clearance</div>
+    </div>
+
+    <nav style={{flex:1,padding:'10px 8px',overflowY:'auto'}}>
+      {NAV.map(item=>(
+        <div key={item.id} onClick={()=>onNav(item.id)} style={{
+          display:'flex',alignItems:'center',gap:9,padding:'8px 10px',
+          borderRadius:5,marginBottom:1,cursor:'pointer',
+          background:active===item.id?`${C.orange}18`:'transparent',
+          color:active===item.id?C.orange:C.text2,
+          borderLeft:active===item.id?`2px solid ${C.orange}`:'2px solid transparent',
+          fontSize:12,fontWeight:active===item.id?600:400,transition:'all 0.12s'
+        }}>
+          <span style={{fontSize:13,width:16,textAlign:'center',flexShrink:0}}>{item.icon}</span>
+          {item.label}
+        </div>
+      ))}
+    </nav>
+
+    <div style={{padding:'12px 14px',borderTop:`1px solid ${C.border}`,display:'flex',flexDirection:'column',gap:5}}>
+      {[['DB_SYNC ACTIVE',C.green,true],['KERNEL V4.8.1',C.cyan,false],['REASONING: 100%',C.orange,false]].map(([t,c,p])=>(
+        <div key={t} style={{display:'flex',alignItems:'center',gap:6}}>
+          <Dot color={c} pulse={p}/>
+          <span style={{fontSize:9,color:C.text3,...mono}}>{t}</span>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+// ── TOPBAR ─────────────────────────────────────────────────────────────────
+const Topbar = ({ title, crumb }) => (
+  <div style={{height:50,borderBottom:`1px solid ${C.border}`,display:'flex',
+    alignItems:'center',padding:'0 20px',gap:14,flexShrink:0,background:C.card}}>
+    <div style={{flex:1,display:'flex',alignItems:'center',gap:8}}>
+      <span style={{fontWeight:700,fontSize:15}}>{title}</span>
+      {crumb&&<span style={{fontSize:11,color:C.text3,...mono}}>{crumb}</span>}
+    </div>
+    <div style={{display:'flex',alignItems:'center',background:C.card2,border:`1px solid ${C.border}`,
+      borderRadius:4,padding:'5px 10px',gap:7,width:180}}>
+      <span style={{color:C.text3,fontSize:12}}>⌕</span>
+      <span style={{fontSize:11,color:C.text3}}>Search parameters...</span>
+    </div>
+    <div style={{display:'flex',alignItems:'center',gap:14}}>
+      <div style={{position:'relative',cursor:'pointer'}}>
+        <span style={{fontSize:15,color:C.text2}}>🔔</span>
+        <div style={{position:'absolute',top:-3,right:-3,background:C.red,borderRadius:'50%',width:13,height:13,
+          display:'flex',alignItems:'center',justifyContent:'center',fontSize:8,fontWeight:700,color:'#fff'}}>3</div>
+      </div>
+      <span style={{fontSize:14,color:C.text2,cursor:'pointer'}}>⚙</span>
+      <div style={{width:26,height:26,borderRadius:'50%',background:C.orange,display:'flex',
+        alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:700,color:'#fff',cursor:'pointer'}}>JD</div>
+    </div>
+  </div>
+);
+
+// ── MISSION CONTROL ────────────────────────────────────────────────────────
+const DECISIONS = [
+  {id:'DEC-091',ref:'APR_2026_0091',title:'Infrastructure Migration ARM-64',
+   gravity:9.2,impact:9,urgency:8,uncertainty:7,irreversibility:9,authority:'LOW',routing:'ESCALATE',
+   confidence:78,reversibility:42,optionValue:8.4,fragility:2.1,status:'CRITICAL',
+   path:['Assess current x86 workload matrix','Provision ARM pilot cluster (N=12)','Migrate non-critical services first'],
+   inverse:'34% risk of cache coherence failures under sustained load spikes exceeding P95.',
+   exegesis:'System identifies critical timing dependency in the finance module. ARM migration during Q2 reporting window carries high state corruption risk. Recommend phased approach with rollback checkpoints at each stage boundary.',
+   conditions:['If finance module cache miss rate exceeds 8% in ARM pilot, abort and revert to x86 indefinitely.','If ARM latency benchmark exceeds 340ms P99, full migration halted pending architecture review.'],
+   tags:['REVERSIBLE','HIGH CONF']},
+  {id:'DEC-092',ref:'APR_2026_0092',title:'Q3 Market Expansion — Southeast Asia',
+   gravity:7.8,impact:8,urgency:6,uncertainty:8,irreversibility:7,authority:'HIGH',routing:'ACT',
+   confidence:92,reversibility:71,optionValue:7.1,fragility:1.8,status:'ACTIVE',
+   path:['Establish Singapore legal entity','Activate regional distribution partner','Soft launch in SG/MY markets Q3'],
+   inverse:'18% risk of regulatory friction in MY market timeline slippage by 90 days.',
+   exegesis:'Competitive window identified. Three rivals delayed expansion. Market entry cost 40% lower than 6-month projection. Authority sufficient for immediate commitment.',
+   conditions:['If MAS entity approval exceeds 60 days, pivot to partner-model entry without direct entity.','If Q3 GDP contraction exceeds 2%, delay by one quarter and reassess.'],
+   tags:['HIGH CONF','WINDOW OPEN']},
+  {id:'DEC-093',ref:'APR_2026_0093',title:'Series B Valuation Cap Negotiation',
+   gravity:6.4,impact:9,urgency:4,uncertainty:6,irreversibility:8,authority:'LOW',routing:'ESCALATE',
+   confidence:65,reversibility:28,optionValue:6.8,fragility:3.4,status:'PENDING',
+   path:['Prepare financial model variants (3 scenarios)','Map investor priority matrix','Define walk-away conditions pre-term sheet'],
+   inverse:'22% probability of down-round conditions if engagement delayed past 45 days.',
+   exegesis:'Valuation anchoring effects detected across three comparable transactions. Current market sentiment window: 14 days. Recommend establishing floor before term sheet arrives.',
+   conditions:['If lead investor introduces participating preferred terms, switch to flat common preference.','If comparable valuations drop 15%+ in 30 days, reduce ask by 20% proactively.'],
+   tags:['IRREVERSIBLE','ESCALATE']},
+  {id:'DEC-094',ref:'APR_2026_0094',title:'Hire VP Engineering (External)',
+   gravity:4.1,impact:6,urgency:3,uncertainty:5,irreversibility:5,authority:'HIGH',routing:'DEFER',
+   confidence:81,reversibility:85,optionValue:5.2,fragility:1.4,status:'QUEUED',
+   path:['Define structured role scorecard','Activate executive search firm','Run blind structured panel interviews'],
+   inverse:'9% risk of internal morale impact if external hire announced before internal pipeline exhausted.',
+   exegesis:'No urgency trigger detected. Internal candidate pipeline has 60-day runway. Recommend batching with Q3 headcount review cycle.',
+   conditions:['If internal candidate pipeline empties by June, trigger external search immediately.','If engineering velocity drops 25% over 6 weeks, accelerate timeline.'],
+   tags:['DEFERRABLE']},
+];
+
+const RouteBadge = ({ r }) => {
+  const m={ESCALATE:[C.red,'ESCALATE ↑'],ACT:[C.green,'ACT NOW'],DEFER:[C.text3,'DEFER']};
+  const [c,l]=m[r]||[C.text3,r];
+  return <Badge color={c}>{l}</Badge>;
+};
+
+const MissionControl = () => {
+  const [sel, setSel] = useState(DECISIONS[0]);
+  const [tab, setTab] = useState('forward');
+  const [pulse, setPulse] = useState(4);
+
+  useEffect(()=>{
+    const id=setInterval(()=>setPulse(p=>(p+1)%8),1800);
+    return ()=>clearInterval(id);
+  },[]);
+
+  const routeColor = r=>r==='ESCALATE'?C.red:r==='ACT'?C.green:C.text3;
+
+  return (
+    <div style={{display:'flex',height:'100%',overflow:'hidden'}}>
+
+      {/* ── LEFT: FEED ── */}
+      <div style={{width:280,borderRight:`1px solid ${C.border}`,display:'flex',flexDirection:'column',flexShrink:0}}>
+        {/* Loop header */}
+        <div style={{padding:'10px 14px',borderBottom:`1px solid ${C.border}`,background:C.card2}}>
+          <SLabel>Attention Engine</SLabel>
+          <div style={{display:'flex',gap:2,flexWrap:'wrap'}}>
+            {['SENSE','FRAME','SIM','STRESS','JUDGE','ACT','OBSERVE','UPDATE'].map((s,i)=>(
+              <span key={s} style={{fontSize:8,...mono,padding:'3px 5px',borderRadius:2,
+                background:i===4?C.orange:i===pulse?`${C.cyan}22`:C.border,
+                color:i===4?'#fff':i===pulse?C.cyan:C.text3,
+                fontWeight:i===4?700:400,transition:'all 0.3s',lineHeight:'14px'}}>
+                {s}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* Gravity feed */}
+        <div style={{flex:1,overflowY:'auto',padding:'10px 10px'}}>
+          <SLabel right={<span style={{fontSize:9,color:C.text3,...mono}}>{DECISIONS.length} ACTIVE</span>}>
+            Decision Gravity Feed
+          </SLabel>
+          {DECISIONS.map(dec=>{
+            const gCol=dec.gravity>=8?C.red:dec.gravity>=6?C.amber:C.cyan;
+            const isSel=sel?.id===dec.id;
+            return (
+              <div key={dec.id} onClick={()=>{setSel(dec);setTab('forward');}} style={{
+                padding:'10px 10px',borderRadius:5,marginBottom:6,cursor:'pointer',
+                background:isSel?C.card2:'transparent',
+                border:`1px solid ${isSel?C.border2:C.border}`,transition:'all 0.12s'}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:5}}>
+                  <span style={{fontSize:8,color:C.text3,...mono}}>{dec.id}</span>
+                  <RouteBadge r={dec.routing}/>
+                </div>
+                <div style={{fontSize:12,fontWeight:600,marginBottom:7,lineHeight:1.4,color:isSel?C.text1:C.text2}}>
+                  {dec.title}
+                </div>
+                <div style={{display:'flex',alignItems:'center',gap:8}}>
+                  <Bar value={dec.gravity*10} color={gCol} h={3} style={{flex:1}}/>
+                  <span style={{fontSize:10,fontWeight:700,color:gCol,...mono,width:22,textAlign:'right'}}>{dec.gravity}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── CENTER: DETAIL ── */}
+      <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden',minWidth:0}}>
+        {sel && <>
+          {/* Decision header */}
+          <div style={{padding:'14px 20px',borderBottom:`1px solid ${C.border}`,background:C.card2,flexShrink:0}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:12}}>
+              <div style={{minWidth:0}}>
+                <div style={{fontSize:9,color:C.text3,...mono,marginBottom:4}}>REF: {sel.ref} · {sel.status}</div>
+                <div style={{fontSize:17,fontWeight:700,lineHeight:1.3}}>{sel.title}</div>
+              </div>
+              <div style={{display:'flex',gap:6,flexShrink:0}}>
+                <Btn sm>SIMULATE</Btn>
+                <Btn sm primary>EXECUTE</Btn>
+              </div>
+            </div>
+            <div style={{display:'flex',gap:6,marginTop:8,flexWrap:'wrap'}}>
+              {sel.tags.map(t=><Badge key={t} color={C.cyan}>{t}</Badge>)}
+              <RouteBadge r={sel.routing}/>
+            </div>
+          </div>
+
+          {/* Tabs */}
+          <div style={{display:'flex',borderBottom:`1px solid ${C.border}`,flexShrink:0,background:C.card2}}>
+            {['forward','inverse','exegesis','counterfactual','aar'].map(t=>(
+              <div key={t} onClick={()=>setTab(t)} style={{
+                padding:'8px 16px',fontSize:11,cursor:'pointer',fontWeight:500,
+                textTransform:'capitalize',letterSpacing:'0.03em',
+                color:tab===t?C.orange:C.text3,
+                borderBottom:tab===t?`2px solid ${C.orange}`:'2px solid transparent',
+                marginBottom:-1,transition:'color 0.12s'}}>
+                {t}
+              </div>
+            ))}
+          </div>
+
+          <div style={{flex:1,overflowY:'auto',padding:'18px 20px'}}>
+            {tab==='forward' && (
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
+                <Card>
+                  <SLabel right={<Badge color={C.green}>PROB: {sel.confidence}%</Badge>}>Forward Path</SLabel>
+                  <div style={{fontSize:11,color:C.text3,marginBottom:12}}>Primary Optimization Route</div>
+                  {sel.path.map((step,i)=>(
+                    <div key={i} style={{display:'flex',gap:10,marginBottom:12,alignItems:'flex-start'}}>
+                      <span style={{fontSize:9,color:C.orange,fontWeight:700,...mono,paddingTop:2,flexShrink:0,width:18}}>0{i+1}</span>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:12,fontWeight:500,marginBottom:4,lineHeight:1.4}}>{step}</div>
+                        <Bar value={88-i*14} color={C.cyan} h={2}/>
+                      </div>
+                    </div>
+                  ))}
+                </Card>
+                <div style={{display:'flex',flexDirection:'column',gap:14}}>
+                  <Card>
+                    <SLabel>Coupling Analysis</SLabel>
+                    {[['Spatial Progress',82,C.cyan],['Temporal Alignment',64,C.orange],['Resource Coherence',71,C.green]].map(([l,v,c])=>(
+                      <div key={l} style={{marginBottom:10}}>
+                        <div style={{display:'flex',justifyContent:'space-between',marginBottom:3}}>
+                          <span style={{fontSize:11,color:C.text2}}>{l}</span>
+                          <span style={{fontSize:10,fontWeight:700,color:c,...mono}}>{v}%</span>
+                        </div>
+                        <Bar value={v} color={c} h={3}/>
+                      </div>
+                    ))}
+                  </Card>
+                  <Card>
+                    <SLabel>Inverse · Contingency</SLabel>
+                    <div style={{fontSize:20,fontWeight:700,color:C.amber,marginBottom:4}}>
+                      {sel.impact}% <span style={{fontSize:10,color:C.text3,fontWeight:400,...mono}}>RISK EXP.</span>
+                    </div>
+                    <div style={{fontSize:11,color:C.text3,lineHeight:1.6}}>{sel.inverse.slice(0,80)}...</div>
+                  </Card>
+                </div>
+              </div>
+            )}
+
+            {tab==='inverse' && (
+              <div style={{display:'flex',flexDirection:'column',gap:14}}>
+                <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:12}}>
+                  {[['Risk Exposure','34%',C.red],['Cascade Probability','12%',C.amber],['Recovery Window','72h',C.cyan]].map(([l,v,c])=>(
+                    <Card key={l}>
+                      <div style={{fontSize:9,color:C.text3,...mono,marginBottom:6}}>{l}</div>
+                      <div style={{fontSize:26,fontWeight:700,color:c}}>{v}</div>
+                    </Card>
+                  ))}
+                </div>
+                <Card style={{background:`${C.red}0c`,border:`1px solid ${C.red}33`}}>
+                  <div style={{fontSize:10,color:C.red,fontWeight:700,marginBottom:8}}>⚠ INVERSION ANALYSIS — FAILURE MODES</div>
+                  <div style={{fontSize:12,color:C.text2,lineHeight:1.7,marginBottom:10}}>{sel.inverse}</div>
+                  <div style={{fontSize:11,color:C.text3,borderTop:`1px solid ${C.border}`,paddingTop:10}}>
+                    Fallback protocol: revert to legacy state if node failure rate exceeds 4% within 30-minute window.
+                  </div>
+                </Card>
+              </div>
+            )}
+
+            {tab==='exegesis' && (
+              <div style={{display:'flex',flexDirection:'column',gap:14}}>
+                <Card>
+                  <SLabel>✦ Exegesis — Context Reconstruction</SLabel>
+                  <div style={{fontSize:13,color:C.text2,lineHeight:1.8,borderLeft:`2px solid ${C.orange}`,paddingLeft:14,marginBottom:16}}>
+                    {sel.exegesis}
+                  </div>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+                    <div style={{padding:12,background:C.card2,borderRadius:5,border:`1px solid ${C.border}`}}>
+                      <div style={{fontSize:9,color:C.text3,...mono,marginBottom:8}}>KEY ACTORS</div>
+                      {['Lead Analyst','Strategy Team','GPT-4o Agent'].map(a=>(
+                        <div key={a} style={{fontSize:11,color:C.text2,marginBottom:5,display:'flex',alignItems:'center',gap:7}}>
+                          <Dot color={C.cyan}/>{a}
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{padding:12,background:C.card2,borderRadius:5,border:`1px solid ${C.border}`}}>
+                      <div style={{fontSize:9,color:C.text3,...mono,marginBottom:8}}>VERIFIED ASSUMPTIONS</div>
+                      {['Market conditions stable','Budget approved','Team capacity confirmed'].map(a=>(
+                        <div key={a} style={{fontSize:11,color:C.text2,marginBottom:5,display:'flex',alignItems:'center',gap:7}}>
+                          <span style={{color:C.green,fontSize:10}}>✓</span>{a}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </Card>
+              </div>
+            )}
+
+            {tab==='counterfactual' && (
+              <Card>
+                <SLabel>What Would Change My Mind?</SLabel>
+                <div style={{fontSize:11,color:C.text3,marginBottom:14}}>Conditions that invalidate the current recommendation</div>
+                {sel.conditions.map((cond,i)=>(
+                  <div key={i} style={{padding:14,background:C.card2,border:`1px solid ${C.border}`,borderRadius:5,marginBottom:10,
+                    borderLeft:`3px solid ${i===0?C.orange:C.purple}`}}>
+                    <div style={{fontSize:9,color:i===0?C.orange:C.purple,fontWeight:700,...mono,marginBottom:6}}>
+                      CONDITION 0{i+1}
+                    </div>
+                    <div style={{fontSize:12,color:C.text2,lineHeight:1.65}}>{cond}</div>
+                  </div>
+                ))}
+              </Card>
+            )}
+
+            {tab==='aar' && (
+              <div style={{display:'flex',flexDirection:'column',gap:14}}>
+                {/* Status banner */}
+                {sel.routing==='DEFER'||sel.status==='QUEUED' ? (
+                  <div style={{padding:14,background:`${C.text3}0c`,border:`1px solid ${C.border}`,borderRadius:6,
+                    display:'flex',alignItems:'center',gap:12}}>
+                    <span style={{fontSize:20,opacity:0.4}}>⏸</span>
+                    <div>
+                      <div style={{fontSize:12,fontWeight:600,color:C.text2,marginBottom:3}}>AAR Not Yet Available</div>
+                      <div style={{fontSize:11,color:C.text3}}>This decision has not been executed. After-Action Review will be generated once an outcome is recorded.</div>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {/* Outcome header */}
+                    <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:12}}>
+                      {[
+                        ['PREDICTED OUTCOME', sel.confidence+'%', 'Confidence at time of decision', C.cyan],
+                        ['ACTUAL OUTCOME',    sel.routing==='ACT'?'91%':'Pending', sel.routing==='ACT'?'Realized post-execution':'Awaiting observation window', sel.routing==='ACT'?C.green:C.amber],
+                        ['CALIBRATION DELTA', sel.routing==='ACT'?'+13%':'—', sel.routing==='ACT'?'Outperformed prediction':'No data yet', sel.routing==='ACT'?C.green:C.text3],
+                      ].map(([l,v,s,c])=>(
+                        <Card key={l} style={{padding:'12px 14px'}}>
+                          <div style={{fontSize:8,color:C.text3,...mono,marginBottom:5}}>{l}</div>
+                          <div style={{fontSize:24,fontWeight:700,color:c,lineHeight:1}}>{v}</div>
+                          <div style={{fontSize:10,color:C.text3,marginTop:4,lineHeight:1.5}}>{s}</div>
+                        </Card>
+                      ))}
+                    </div>
+
+                    {/* Prediction vs actual chart */}
+                    <Card>
+                      <SLabel right={<Badge color={sel.routing==='ACT'?C.green:C.amber}>{sel.routing==='ACT'?'CLOSED':'OPEN'}</Badge>}>
+                        Prediction vs. Outcome Trajectory
+                      </SLabel>
+                      <div style={{position:'relative',height:100,marginBottom:8}}>
+                        <svg width="100%" height="100" viewBox="0 0 400 100" preserveAspectRatio="none">
+                          <defs>
+                            <linearGradient id="aarCyan" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor={C.cyan} stopOpacity="0.2"/>
+                              <stop offset="100%" stopColor={C.cyan} stopOpacity="0"/>
+                            </linearGradient>
+                          </defs>
+                          {/* predicted band */}
+                          <polygon points="0,60 80,52 160,45 240,40 320,38 400,35 400,55 320,55 240,58 160,62 80,68 0,72"
+                            fill={`${C.cyan}18`}/>
+                          {/* predicted line */}
+                          <polyline points="0,66 80,60 160,53 240,49 320,46 400,45"
+                            fill="none" stroke={C.cyan} strokeWidth="1.5" strokeDasharray="4 3"/>
+                          {/* actual line */}
+                          {sel.routing==='ACT' && (
+                            <polyline points="0,66 80,55 160,44 240,35 320,28 400,22"
+                              fill="none" stroke={C.green} strokeWidth="2" strokeLinecap="round"/>
+                          )}
+                          {/* now marker */}
+                          <line x1="260" y1="0" x2="260" y2="100" stroke={C.border2} strokeWidth="1" strokeDasharray="3 3"/>
+                          <text x="263" y="12" fill={C.text3} fontSize="8" fontFamily="Space Mono">NOW</text>
+                        </svg>
+                      </div>
+                      <div style={{display:'flex',gap:16,fontSize:9,...mono}}>
+                        {[[C.cyan,'PREDICTED (confidence band)'],[C.green,'ACTUAL (observed)']].map(([c,l])=>(
+                          <div key={l} style={{display:'flex',alignItems:'center',gap:5,color:C.text3}}>
+                            <div style={{width:14,height:2,background:c,borderRadius:1}}/>
+                            {l}
+                          </div>
+                        ))}
+                      </div>
+                    </Card>
+
+                    {/* Lessons + bias detection */}
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
+                      <Card>
+                        <SLabel>Lessons Recorded</SLabel>
+                        {[
+                          {icon:'✓',color:C.green, text:'Forward path sequence executed within projected timeline.'},
+                          {icon:'✓',color:C.green, text:'Reversibility held — rollback not required at any stage.'},
+                          {icon:'⚠',color:C.amber, text:'Inverse risk (vendor decoupling) underweighted in initial gravity score.'},
+                        ].map((l,i)=>(
+                          <div key={i} style={{display:'flex',gap:8,marginBottom:10,alignItems:'flex-start'}}>
+                            <span style={{color:l.color,fontSize:12,flexShrink:0,marginTop:1}}>{l.icon}</span>
+                            <div style={{fontSize:11,color:C.text2,lineHeight:1.55}}>{l.text}</div>
+                          </div>
+                        ))}
+                      </Card>
+                      <Card>
+                        <SLabel>Bias Detection</SLabel>
+                        {[
+                          ['Overconfidence',   38, C.amber],
+                          ['Anchoring',        12, C.green],
+                          ['Recency Bias',     21, C.cyan],
+                          ['Authority Defer',   8, C.green],
+                        ].map(([label,v,c])=>(
+                          <div key={label} style={{marginBottom:9}}>
+                            <div style={{display:'flex',justifyContent:'space-between',marginBottom:3}}>
+                              <span style={{fontSize:11,color:C.text2}}>{label}</span>
+                              <span style={{fontSize:9,fontWeight:700,color:c,...mono}}>{v}%</span>
+                            </div>
+                            <Bar value={v} color={c} h={3}/>
+                          </div>
+                        ))}
+                      </Card>
+                    </div>
+
+                    {/* S3 reflection */}
+                    <Card style={{background:`${C.purple}08`,border:`1px solid ${C.purple}25`}}>
+                      <SLabel right={<Badge color={C.purple}>S3 META LAYER</Badge>}>System Reflection — Calibration Update</SLabel>
+                      <div style={{fontSize:12,color:C.text2,lineHeight:1.75,borderLeft:`2px solid ${C.purple}`,paddingLeft:14}}>
+                        Decision authority routing performed correctly. Gravity score of {sel.gravity} appropriately surfaced this decision ahead of 3 lower-priority items. Recommend increasing irreversibility weight by 0.1× for decisions in this category to improve future precision.
+                      </div>
+                      <div style={{display:'flex',gap:8,marginTop:12}}>
+                        <Btn sm primary>APPLY CALIBRATION</Btn>
+                        <Btn sm>DEFER TO NEXT CYCLE</Btn>
+                      </div>
+                    </Card>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </>}
+      </div>
+
+      {/* ── RIGHT: METRICS ── */}
+      <div style={{width:200,borderLeft:`1px solid ${C.border}`,padding:12,display:'flex',flexDirection:'column',gap:10,overflowY:'auto',flexShrink:0}}>
+        {sel && <>
+          <Card style={{padding:'12px 14px'}}>
+            <div style={{fontSize:9,color:C.text3,...mono,marginBottom:5}}>OPTION VALUE</div>
+            <div style={{fontSize:26,fontWeight:700,lineHeight:1}}>{sel.optionValue}</div>
+            <div style={{fontSize:10,color:C.green,marginTop:4}}>↗ +1.2 vs Baseline</div>
+          </Card>
+          <Card style={{padding:'12px 14px'}}>
+            <div style={{fontSize:9,color:C.text3,...mono,marginBottom:5}}>FRAGILITY SCORE</div>
+            <div style={{fontSize:26,fontWeight:700,color:sel.fragility>3?C.red:sel.fragility>2?C.amber:C.green,lineHeight:1}}>{sel.fragility}</div>
+            <div style={{fontSize:10,color:C.text3,marginTop:4}}>Optimal: 1.5 – 3.0</div>
+          </Card>
+          <Card style={{padding:'12px 14px'}}>
+            <SLabel>Reversibility</SLabel>
+            <Bar value={sel.reversibility} color={sel.reversibility>60?C.green:sel.reversibility>30?C.amber:C.red} h={5} style={{marginBottom:5}}/>
+            <div style={{fontSize:12,fontWeight:700,color:sel.reversibility>60?C.green:C.amber}}>
+              {sel.reversibility}% {sel.reversibility>60?'HIGH':'MEDIUM'}
+            </div>
+            <div style={{fontSize:10,color:C.text3,marginTop:6,lineHeight:1.5}}>94% of actions rollback within 120ms</div>
+          </Card>
+          <Card style={{padding:'12px 14px'}}>
+            <SLabel>DAM Scores</SLabel>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:5}}>
+              {[['Gravity',`${sel.gravity}/10`],['Authority',sel.authority],['Impact',`${sel.impact}/10`],['Urgency',`${sel.urgency}/10`]].map(([k,v])=>(
+                <div key={k} style={{background:C.card2,borderRadius:4,padding:'5px 7px'}}>
+                  <div style={{fontSize:8,color:C.text3,...mono}}>{k}</div>
+                  <div style={{fontSize:11,fontWeight:700}}>{v}</div>
+                </div>
+              ))}
+            </div>
+          </Card>
+          <div style={{padding:'12px 14px',background:`${routeColor(sel.routing)}14`,border:`1px solid ${routeColor(sel.routing)}44`,borderRadius:6}}>
+            <div style={{fontSize:8,...mono,color:C.text3,marginBottom:3}}>VERDICT</div>
+            <div style={{fontSize:16,fontWeight:700,color:routeColor(sel.routing)}}>
+              {sel.routing==='ESCALATE'?'↑ ESCALATE':sel.routing==='ACT'?'▶ ACT NOW':'⏸ DEFER'}
+            </div>
+            <div style={{fontSize:9,color:C.text3,marginTop:4,lineHeight:1.5}}>
+              {sel.routing==='ESCALATE'?'High gravity · insufficient authority':sel.routing==='ACT'?'Authority sufficient · proceed':'Low gravity · batch for review'}
+            </div>
+          </div>
+        </>}
+      </div>
+    </div>
+  );
+};
+
+const routeColor=r=>r==='ESCALATE'?C.red:r==='ACT'?C.green:C.text3;
+
+// ── DECISION THEATER ───────────────────────────────────────────────────────
+const DecisionTheater = () => {
+  const [stress, setStress]   = useState(0.45);
+  const [curv, setCurv]       = useState(0.15);
+  const [viab, setViab]       = useState(0.72);
+  const [entropy, setEntropy] = useState(0.38);
+  const [running, setRunning] = useState(false);
+  const [done2, setDone2]     = useState(false);
+  const [score, setScore]     = useState(84);
+
+  const runSim = () => {
+    setRunning(true); setDone2(false);
+    setTimeout(()=>{
+      setRunning(false); setDone2(true);
+      setScore(Math.floor(75 + viab*20 - stress*12 + Math.random()*5));
+    }, 2000);
+  };
+
+  const milestones = [
+    {label:'Domain Mapping',status:'COMPLETE',done:true,detail:'Identified 12 bounded contexts and aggregates.'},
+    {label:'Infrastructure Baseline',status:'IN PROGRESS',done:false,prog:48,detail:'Benchmarking current latencies across legacy nodes.'},
+    {label:'Security Audit',status:'PENDING',done:false,detail:'Awaiting compliance team availability.'},
+  ];
+
+  return (
+    <div style={{display:'flex',height:'100%',overflow:'hidden'}}>
+      {/* Context capture */}
+      <div style={{width:270,borderRight:`1px solid ${C.border}`,overflowY:'auto',padding:14,flexShrink:0}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+          <span style={{fontSize:11,fontWeight:700,color:C.text1}}>Context Capture</span>
+          <Badge color={C.green}>LOCKED</Badge>
+        </div>
+        <Card style={{marginBottom:10}}>
+          <div style={{fontSize:8,color:C.text3,...mono,marginBottom:6}}>PRIMARY TASK</div>
+          <div style={{fontSize:12,fontWeight:600,lineHeight:1.5,color:C.text1}}>Analyze feasibility of migrating legacy ERP to microservices under 300ms latency requirement.</div>
+        </Card>
+        <Card style={{marginBottom:10}}>
+          <div style={{fontSize:8,color:C.text3,...mono,marginBottom:7}}>KEY ACTORS</div>
+          {['Lead Architect','GPT-4o Agent','DevOps Team'].map(a=>(
+            <div key={a} style={{fontSize:11,color:C.text2,marginBottom:5,display:'flex',alignItems:'center',gap:8}}>
+              <div style={{width:16,height:16,borderRadius:3,background:C.border2,display:'flex',alignItems:'center',justifyContent:'center',fontSize:8}}>👤</div>
+              {a}
+            </div>
+          ))}
+        </Card>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:10}}>
+          <Card>
+            <div style={{fontSize:8,color:C.red,...mono,marginBottom:5}}>CONSTRAINTS</div>
+            {['Fixed budget $2.4M','Q4 Deployment'].map(c=>(
+              <div key={c} style={{fontSize:10,color:C.text2,marginBottom:4,display:'flex',gap:5,lineHeight:1.4}}>
+                <span style={{color:C.red,flexShrink:0}}>!</span>{c}
+              </div>
+            ))}
+          </Card>
+          <Card>
+            <div style={{fontSize:8,color:C.green,...mono,marginBottom:5}}>ASSUMPTIONS</div>
+            {['Kafka cluster ready','Team has Go skills'].map(a=>(
+              <div key={a} style={{fontSize:10,color:C.text2,marginBottom:4,display:'flex',gap:5,lineHeight:1.4}}>
+                <span style={{color:C.green,flexShrink:0}}>✓</span>{a}
+              </div>
+            ))}
+          </Card>
+        </div>
+        <Card style={{background:`${C.orange}0a`,border:`1px solid ${C.orange}30`}}>
+          <div style={{fontSize:8,color:C.orange,...mono,marginBottom:6}}>EXEGESIS NOTES</div>
+          <div style={{fontSize:11,color:C.text2,lineHeight:1.65,fontStyle:'italic'}}>"The system's previous failure was rooted in data consistency, not compute power. We must favor CP over AP in the CAP theorem for the finance module."</div>
+        </Card>
+      </div>
+
+      {/* Main simulation area */}
+      <div style={{flex:1,overflowY:'auto',padding:'18px 20px'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:18}}>
+          <div>
+            <div style={{fontSize:17,fontWeight:700,marginBottom:3}}>Decision Theater</div>
+            <div style={{fontSize:11,color:C.text3,...mono}}>
+              SENSE → FRAME → <span style={{color:C.orange}}>SIMULATE</span> → STRESS → JUDGE
+            </div>
+          </div>
+          <div style={{display:'flex',gap:8,alignItems:'center'}}>
+            {running && <span style={{fontSize:10,color:C.amber,...mono}}>⟳ RUNNING SIMULATION...</span>}
+            {done2 && !running && <Badge color={C.green}>COMPLETE</Badge>}
+            <Btn onClick={runSim} primary={!running} style={{opacity:running?0.5:1}}>▶ SIMULATE</Btn>
+          </div>
+        </div>
+
+        {/* Progress bar */}
+        <div style={{marginBottom:18}}>
+          <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
+            <span style={{fontSize:9,color:C.text3,...mono}}>AI DECOMPOSITION PROGRESS</span>
+            <span style={{fontSize:9,color:C.orange,...mono}}>75%</span>
+          </div>
+          <Bar value={75} color={C.orange} h={3}/>
+        </div>
+
+        {/* Milestones */}
+        <Card style={{marginBottom:14}}>
+          <SLabel>Milestones & Progress</SLabel>
+          {milestones.map(m=>(
+            <div key={m.label} style={{display:'flex',gap:12,marginBottom:14,alignItems:'flex-start'}}>
+              <div style={{width:20,height:20,borderRadius:'50%',
+                background:m.done?C.green:m.prog?C.orange:C.border2,
+                display:'flex',alignItems:'center',justifyContent:'center',
+                fontSize:10,flexShrink:0,marginTop:1,color:m.done?C.bg:C.text1}}>
+                {m.done?'✓':m.prog?'⟳':'·'}
+              </div>
+              <div style={{flex:1}}>
+                <div style={{display:'flex',justifyContent:'space-between',marginBottom:3}}>
+                  <span style={{fontSize:12,fontWeight:600}}>{m.label}</span>
+                  <Badge color={m.done?C.green:m.prog?C.amber:C.text3}>{m.status}</Badge>
+                </div>
+                <div style={{fontSize:11,color:C.text3,marginBottom:m.prog?6:0,lineHeight:1.5}}>{m.detail}</div>
+                {m.prog && <Bar value={m.prog} color={C.orange} h={3}/>}
+              </div>
+            </div>
+          ))}
+        </Card>
+
+        {/* Recommended path */}
+        <Card style={{background:`${C.cyan}07`,border:`1px solid ${C.cyan}30`}}>
+          <SLabel right={<Badge color={C.cyan}>AI CONFIDENCE</Badge>}>Recommended Path</SLabel>
+          {[['P1','Strangler Fig Pattern implementation',score],['P2','Async messaging via NATS',87]].map(([p,label,conf])=>(
+            <div key={p} style={{display:'flex',justifyContent:'space-between',alignItems:'center',
+              padding:'9px 12px',background:C.card2,borderRadius:5,marginBottom:8,border:`1px solid ${C.border}`}}>
+              <div style={{display:'flex',gap:10,alignItems:'center'}}>
+                <span style={{fontSize:9,color:C.cyan,fontWeight:700,...mono}}>{p}</span>
+                <span style={{fontSize:12,fontWeight:500}}>{label}</span>
+              </div>
+              <div style={{textAlign:'center',flexShrink:0}}>
+                <div style={{fontSize:16,fontWeight:700,color:C.cyan,...mono}}>{conf}%</div>
+                <div style={{fontSize:8,color:C.text3,...mono}}>CONFIDENCE</div>
+              </div>
+            </div>
+          ))}
+        </Card>
+      </div>
+
+      {/* What-if controls */}
+      <div style={{width:220,borderLeft:`1px solid ${C.border}`,overflowY:'auto',padding:14,flexShrink:0}}>
+        <SLabel>What-If Controls</SLabel>
+        {[['STRESS LEVEL',stress,setStress,C.orange],['CURVATURE DELTA',curv,setCurv,C.purple],
+          ['VIABILITY INDEX',viab,setViab,C.cyan],['ENTROPY THRESHOLD',entropy,setEntropy,C.amber]].map(([label,val,setter,color])=>(
+          <div key={label} style={{marginBottom:14}}>
+            <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
+              <span style={{fontSize:8,color:C.text3,...mono,letterSpacing:'0.07em'}}>{label}</span>
+              <span style={{fontSize:9,color,fontWeight:700,...mono}}>{val.toFixed(2)}</span>
+            </div>
+            <input type="range" min={0} max={1} step={0.01} value={val}
+              onChange={e=>setter(parseFloat(e.target.value))}
+              style={{width:'100%',color,accentColor:color}}/>
+          </div>
+        ))}
+        <Btn sm onClick={runSim} primary style={{width:'100%',marginBottom:6}}>SIMULATE</Btn>
+        <Btn sm style={{width:'100%',marginBottom:16}}>RESET</Btn>
+
+        <div style={{borderTop:`1px solid ${C.border}`,paddingTop:14,marginBottom:14}}>
+          <SLabel>Top Signals</SLabel>
+          {[{l:'Latency Surplus',s:'Overhead 40% below projection.',c:C.green,i:'↗'},
+            {l:'Team Saturation',s:'Senior talent over-allocated.',c:C.amber,i:'⚠'}].map(sig=>(
+            <div key={sig.l} style={{padding:9,background:`${sig.c}10`,border:`1px solid ${sig.c}28`,borderRadius:4,marginBottom:7}}>
+              <div style={{fontSize:11,fontWeight:600,color:sig.c,marginBottom:2}}>{sig.i} {sig.l}</div>
+              <div style={{fontSize:10,color:C.text3}}>{sig.s}</div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{borderTop:`1px solid ${C.border}`,paddingTop:14}}>
+          <div style={{textAlign:'center',marginBottom:8}}>
+            <div style={{fontSize:34,fontWeight:700,color:C.orange,...mono}}>{score}</div>
+            <div style={{fontSize:8,color:C.text3,...mono}}>OVERALL SCORE</div>
+          </div>
+          <div style={{fontSize:10,color:C.text3,textAlign:'center',marginBottom:12,lineHeight:1.5}}>
+            High viability · known risks manageable through actor allocation
+          </div>
+          <Btn sm primary full>▶ GENERATE REPORT</Btn>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── DECISION LOG ───────────────────────────────────────────────────────────
+const LOG_ITEMS = [
+  {ref:'APR_2026_0091',title:'Infrastructure Migration ARM-64',status:'COMMITTED',sc:C.cyan,
+   desc:'Phased migration to ARM-64 cluster approved. System 2 Analysis flags high reversibility debt. Primary friction: latency variance in finance module during Q2.',
+   sp:78,impact:'+14%',rev:'88%',tags:['EXEGESIS','ANALOGY','COUNTER']},
+  {ref:'DEC_2025_0082',title:'Autonomous Freight Corridor (B-12)',status:'SIMULATED',sc:C.purple,
+   desc:'Hypothetical conversion of logistics routes to Level 5 autonomous fleets. Simulation flagged critical "Cascading Delay" risk under weather variance. Not committed.',
+   sp:42,impact:'+22%',rev:'15%',tags:['EXEGESIS','ANALOGY','COUNTER']},
+  {ref:'DEC_2025_0071 [CRITICAL_FAILURE]',title:'Regional Grid Surcharge Alpha',status:'DISCARDED',sc:C.red,
+   desc:'Proposal to dynamically price energy during peak volatility. Auto-discarded by Delphi S3 layer after identifying 89% probability of public unrest and essential service disruption in low-density zones.',
+   sp:12,impact:'-32%',rev:'4%',tags:['POST-MORTEM']},
+  {ref:'NOV_2025_0068',title:'Series A Follow-On Bridge Round',status:'COMMITTED',sc:C.cyan,
+   desc:'Bridge financing approved to extend runway 14 months. Calibration model projected 91% success. Actual outcome aligned within 3% of forecast — strong calibration signal.',
+   sp:91,impact:'+8%',rev:'62%',tags:['EXEGESIS','ANALOGY']},
+];
+
+const DecisionLog = () => {
+  const [filter, setFilter] = useState('ALL');
+  const items = filter==='ALL'?LOG_ITEMS:LOG_ITEMS.filter(l=>l.status===filter);
+
+  return (
+    <div style={{display:'flex',height:'100%',overflow:'hidden'}}>
+      <div style={{flex:1,overflowY:'auto',padding:'18px 22px'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:18}}>
+          <div>
+            <div style={{fontSize:17,fontWeight:700,marginBottom:4}}>Decision Log</div>
+            <div style={{fontSize:10,color:C.text3,display:'flex',alignItems:'center',gap:7,...mono}}>
+              <Dot color={C.green} pulse/>&nbsp;DB_SYNC: ACTIVE [0x9212] · {LOG_ITEMS.length} DIRECTIVES
+            </div>
+          </div>
+          <Btn sm primary>+ NEW DIRECTIVE</Btn>
+        </div>
+
+        {/* Filter bar */}
+        <div style={{display:'flex',gap:7,marginBottom:18}}>
+          <div style={{flex:1,display:'flex',alignItems:'center',background:C.card2,border:`1px solid ${C.border}`,borderRadius:4,padding:'5px 10px',gap:7}}>
+            <span style={{color:C.text3,fontSize:12}}>⌕</span>
+            <span style={{fontSize:11,color:C.text3}}>Search directives by keyword or ID...</span>
+          </div>
+          {['ALL','COMMITTED','SIMULATED','DISCARDED'].map(f=>(
+            <Btn key={f} sm onClick={()=>setFilter(f)}
+              style={{background:filter===f?C.orange:'transparent',color:filter===f?'#fff':C.text2,borderColor:filter===f?C.orange:C.border2}}>
+              {f}
+            </Btn>
+          ))}
+        </div>
+
+        {items.map((item,i)=>(
+          <div key={i} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:6,marginBottom:12,overflow:'hidden'}}>
+            <div style={{padding:'14px 18px',display:'flex',gap:16}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:7}}>
+                  <div>
+                    <div style={{fontSize:8,color:C.text3,...mono,marginBottom:3}}>REF: {item.ref}</div>
+                    <div style={{fontSize:14,fontWeight:700}}>{item.title}</div>
+                  </div>
+                  <Badge color={item.sc}>{item.status}</Badge>
+                </div>
+                <div style={{fontSize:11,color:C.text2,lineHeight:1.65,marginBottom:12}}>{item.desc}</div>
+                <div style={{display:'flex',gap:24}}>
+                  {[['SUCCESS PROB',item.sp+'%',item.sp>60?C.green:item.sp>30?C.amber:C.red],
+                    ['IMPACT Δ',item.impact,parseFloat(item.impact)>0?C.green:C.red],
+                    ['REVERSIBILITY',item.rev,C.cyan]].map(([l,v,c])=>(
+                    <div key={l}>
+                      <div style={{fontSize:8,color:C.text3,...mono,marginBottom:2}}>{l}</div>
+                      <div style={{fontSize:20,fontWeight:700,color:c,...mono}}>{v}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div style={{width:100,height:100,flexShrink:0,background:C.card2,borderRadius:4,
+                display:'flex',alignItems:'center',justifyContent:'center',
+                fontSize:36,color:item.sc,opacity:0.2}}>
+                {item.status==='COMMITTED'?'◈':item.status==='SIMULATED'?'⬡':'✕'}
+              </div>
+            </div>
+            <div style={{borderTop:`1px solid ${C.border}`,padding:'8px 18px',display:'flex',justifyContent:'space-between',alignItems:'center',background:C.card2}}>
+              <div style={{display:'flex',gap:6}}>{item.tags.map(t=><Badge key={t} color={C.text3}>{t}</Badge>)}</div>
+              <span style={{fontSize:10,color:C.orange,cursor:'pointer',fontWeight:700,...mono}}>DEEP ANALYSIS →</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Calibration sidebar */}
+      <div style={{width:200,borderLeft:`1px solid ${C.border}`,padding:14,overflowY:'auto',flexShrink:0}}>
+        <Card style={{marginBottom:12}}>
+          <SLabel>Calibration</SLabel>
+          <div style={{display:'flex',gap:2,alignItems:'flex-end',height:56,marginBottom:7}}>
+            {[32,48,44,66,82,90].map((h,i)=>(
+              <div key={i} style={{flex:1,background:i===5?C.green:`${C.cyan}70`,borderRadius:'2px 2px 0 0',height:`${h}%`,transition:'height 0.4s'}}/>
+            ))}
+          </div>
+          <div style={{display:'flex',justifyContent:'space-between',fontSize:8,color:C.text3,...mono,marginBottom:10}}>
+            <span>NOV</span><span>DEC</span><span>JAN</span><span>FEB</span><span>MAR</span><span>APR</span>
+          </div>
+          {[['Model Confidence','98.4%'],['Mean Error Rate','0.021'],['Decisions Eval.','1,482']].map(([k,v])=>(
+            <div key={k} style={{display:'flex',justifyContent:'space-between',marginBottom:7}}>
+              <span style={{fontSize:11,color:C.text2}}>{k}</span>
+              <span style={{fontSize:10,fontWeight:700,...mono,color:C.text1}}>{v}</span>
+            </div>
+          ))}
+        </Card>
+        <Card style={{background:`${C.cyan}08`,border:`1px solid ${C.cyan}22`,marginBottom:12}}>
+          <div style={{fontSize:8,color:C.cyan,...mono,marginBottom:5}}>HISTORICAL CONTEXT</div>
+          <div style={{fontSize:11,color:C.text2,lineHeight:1.6,marginBottom:8}}>All directives are immutable and signed via the operator's private biometric key.</div>
+          <div style={{fontSize:10,color:C.orange,cursor:'pointer',fontWeight:700,...mono}}>DOWNLOAD ARCHIVE (JSON)</div>
+        </Card>
+        <Card>
+          <SLabel>Active Benchmarks</SLabel>
+          {[['Logic Rate v4',C.cyan,72],['Vector Core',C.purple,58],['Entropy Map',C.orange,45]].map(([l,c,v])=>(
+            <div key={l} style={{marginBottom:8}}>
+              <div style={{display:'flex',justifyContent:'space-between',marginBottom:3}}>
+                <span style={{fontSize:10,color:C.text2}}>{l}</span>
+                <span style={{fontSize:9,color:c,...mono}}>{v}%</span>
+              </div>
+              <Bar value={v} color={c} h={3}/>
+            </div>
+          ))}
+        </Card>
+      </div>
+    </div>
+  );
+};
+
+// ── INTELLIGENCE ───────────────────────────────────────────────────────────
+const Intelligence = () => {
+  const [layer, setLayer] = useState('S2');
+  const chartPts = [22,28,35,31,42,38,51,47,60,68,74,82,89];
+
+  return (
+    <div style={{display:'flex',height:'100%',overflow:'hidden'}}>
+      {/* Left sub-nav */}
+      <div style={{width:160,borderRight:`1px solid ${C.border}`,padding:12,flexShrink:0}}>
+        <div style={{fontSize:9,color:C.text3,...mono,marginBottom:8,textTransform:'uppercase',letterSpacing:'0.1em'}}>Monitoring</div>
+        {['Decision Log','Portfolio Review','Calibration','Robustness'].map(item=>(
+          <div key={item} style={{padding:'8px 10px',borderRadius:4,marginBottom:2,fontSize:12,
+            color:item==='Decision Log'?C.orange:C.text2,
+            background:item==='Decision Log'?`${C.orange}18`:'transparent',
+            cursor:'pointer',borderLeft:item==='Decision Log'?`2px solid ${C.orange}`:'2px solid transparent'}}>
+            {item}
+          </div>
+        ))}
+        <div style={{marginTop:24,padding:12,background:C.card2,border:`1px solid ${C.border}`,borderRadius:5}}>
+          <div style={{fontSize:8,color:C.text3,...mono,marginBottom:3}}>SYSTEM HEALTH</div>
+          <div style={{fontSize:24,fontWeight:700,color:C.green}}>98.4%</div>
+          <div style={{fontSize:10,color:C.green}}>+1.2% this cycle</div>
+        </div>
+      </div>
+
+      <div style={{flex:1,overflowY:'auto',padding:'18px 22px'}}>
+        {/* Header */}
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:18}}>
+          <div>
+            <div style={{fontSize:17,fontWeight:700,marginBottom:3}}>System Intelligence Overview</div>
+            <div style={{fontSize:11,color:C.text3}}>Analyzing reasoning sequences across cognitive hierarchies</div>
+          </div>
+          <div style={{display:'flex',border:`1px solid ${C.border}`,borderRadius:5,overflow:'hidden'}}>
+            {['S1','S2','S3'].map(s=>(
+              <div key={s} onClick={()=>setLayer(s)} style={{
+                padding:'6px 14px',cursor:'pointer',fontSize:11,fontWeight:700,...mono,
+                background:layer===s?C.orange:'transparent',
+                color:layer===s?'#fff':C.text2,transition:'all 0.12s'}}>
+                {s==='S1'?'S1 Intuitive':s==='S2'?'S2 Analytical':'S3 Strategic'}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* KPIs */}
+        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:12,marginBottom:18}}>
+          {[['Reversibility Debt','$42,500','↑ 5.2%','High leverage, low exit decisions',C.red],
+            ['Calibration Error','0.12','↓ 2.1%','Gap: confidence vs accuracy',C.green],
+            ['Robustness Gain','+18.4%','↑ 4.0%','Outcome invariance to S1 noise',C.green]].map(([l,v,d,s,ac])=>(
+            <Card key={l} style={{padding:'12px 14px'}}>
+              <div style={{fontSize:8,color:C.text3,...mono,marginBottom:5}}>{l}</div>
+              <div style={{fontSize:22,fontWeight:700,lineHeight:1}}>{v}</div>
+              <div style={{fontSize:10,color:ac,marginTop:3}}>{d}</div>
+              <div style={{fontSize:10,color:C.text3,marginTop:3}}>{s}</div>
+            </Card>
+          ))}
+        </div>
+
+        {/* Charts row */}
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14,marginBottom:18}}>
+          <Card>
+            <SLabel right={<span style={{fontSize:10,color:C.orange,...mono}}>Last 30 Days ▾</span>}>Calibration Curves</SLabel>
+            <div style={{height:130,position:'relative',overflow:'hidden'}}>
+              <MiniChart points={chartPts} color={C.orange} height={120} fill/>
+              <svg width="100%" height="120" viewBox="0 0 220 120" preserveAspectRatio="none" style={{position:'absolute',top:0,left:0}}>
+                <line x1="0" y1="116" x2="220" y2="4" stroke={C.border2} strokeWidth="1" strokeDasharray="3 3"/>
+              </svg>
+            </div>
+            <div style={{display:'flex',justifyContent:'space-between',fontSize:9,color:C.text3,...mono,marginTop:4}}>
+              <span>Conf: 0%</span><span>Conf: 100%</span>
+            </div>
+          </Card>
+          <Card>
+            <SLabel>Reasoning Sequences</SLabel>
+            {[{id:'DEC-091',t:'Infrastructure Migration',time:'2h ago',tags:['REVERSIBLE','HIGH CONF'],
+               d:'Shift to ARM-64. System 2 flags high reversibility debt.'},
+              {id:'DEC-090',t:'Quarterly Hiring Plan',time:'Yesterday',tags:['DEFERRED'],
+               d:'S3 review: conservative scaling due to market volatility.'},
+              {id:'DEC-089',t:'API Pricing Restructure',time:'3 days ago',tags:['COMMITTED'],
+               d:'Tiered pricing approved. Robustness gain measured at +12%.'}].map(s=>(
+              <div key={s.id} style={{padding:'10px 0',borderBottom:`1px solid ${C.border}`}}>
+                <div style={{display:'flex',justifyContent:'space-between',marginBottom:3}}>
+                  <span style={{fontSize:11,fontWeight:600,color:C.orange}}>{s.id}: {s.t}</span>
+                  <span style={{fontSize:9,color:C.text3}}>{s.time}</span>
+                </div>
+                <div style={{fontSize:11,color:C.text3,marginBottom:5,lineHeight:1.4}}>{s.d}</div>
+                <div style={{display:'flex',gap:5}}>{s.tags.map(t=><Badge key={t} color={C.cyan}>{t}</Badge>)}</div>
+              </div>
+            ))}
+          </Card>
+        </div>
+
+        {/* AAR */}
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+          <div style={{fontSize:14,fontWeight:700}}>Pending After-Action Reviews (AAR)</div>
+          <span style={{fontSize:11,color:C.orange,cursor:'pointer'}}>View All →</span>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:12}}>
+          {[{t:'Marketing Pivot S1 Error',st:'DUE IN 2D',sc:C.amber,bc:C.amber,
+             d:'Outcome: Low engagement. Predicted 80% success. S1 bias detected in creative choices.',owner:'SARAH JENKINS'},
+            {t:'API Pricing Tier Launch',st:'REVIEW NEEDED',sc:C.green,bc:C.green,
+             d:'Outcome: Exceeded target by 15%. Predicted 60% success. Robustness gain high.',owner:'MICHAEL CHEN'},
+            {t:'New Region Expansion',st:'WAITING DATA',sc:C.text3,bc:C.border,
+             d:'Outcome: Pending metrics. Confidence range was 40–70%. S3 long-term play.',owner:'ELENA RODRIGUEZ'}].map(a=>(
+            <div key={a.t} style={{background:C.card,border:`1px solid ${a.bc}44`,borderRadius:6,padding:14,borderTop:`3px solid ${a.bc}`}}>
+              <Badge color={a.sc}>{a.st}</Badge>
+              <div style={{fontSize:13,fontWeight:700,margin:'8px 0'}}>{a.t}</div>
+              <div style={{fontSize:11,color:C.text3,lineHeight:1.5,marginBottom:10}}>{a.d}</div>
+              <div style={{fontSize:8,color:C.text3,...mono}}>OWNER: {a.owner}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── GOVERNANCE ─────────────────────────────────────────────────────────────
+const DAM = [
+  {decision:'Budget Reallocation',level:'Executive',threshold:'>$500K',status:'ACTIVE',auth:9},
+  {decision:'Market Entry',level:'Board',threshold:'New Region',status:'ACTIVE',auth:10},
+  {decision:'Technical Architecture',level:'CTO',threshold:'Core Infra',status:'DELEGATED',auth:7},
+  {decision:'Hiring >VP Level',level:'CEO',threshold:'>L8',status:'ACTIVE',auth:9},
+  {decision:'Partner Agreements',level:'Strategy',threshold:'>$100K ARR',status:'ACTIVE',auth:6},
+  {decision:'Product Roadmap Q+2',level:'CPO',threshold:'Major Features',status:'DELEGATED',auth:7},
+];
+
+const Governance = () => (
+  <div style={{display:'flex',height:'100%',overflow:'hidden'}}>
+    <div style={{flex:1,overflowY:'auto',padding:'18px 22px'}}>
+      <div style={{display:'flex',justifyContent:'space-between',marginBottom:18}}>
+        <div>
+          <div style={{fontSize:17,fontWeight:700,marginBottom:3}}>Executive Mission Control</div>
+          <div style={{fontSize:11,color:C.text3}}>Governance Layer · Portfolio & Authority Management</div>
+        </div>
+        <div style={{display:'flex',gap:7}}>
+          <Btn sm>EXPORT REPORT</Btn>
+          <Btn sm primary>INITIATE RECOVERY</Btn>
+        </div>
+      </div>
+
+      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:12,marginBottom:18}}>
+        {[['CURRENT DEBT VALUE','$142,500','↑ 5.2%',C.red],
+          ['DEBT-TO-EQUITY RATIO','0.14',null,C.amber],
+          ['RECOVERY WINDOW','24 Days',null,C.cyan]].map(([l,v,d,c])=>(
+          <Card key={l} style={{padding:'12px 14px'}}>
+            <div style={{fontSize:8,color:C.text3,...mono,marginBottom:5}}>{l}</div>
+            <div style={{fontSize:24,fontWeight:700,color:l.includes('WINDOW')?c:C.text1,lineHeight:1}}>{v}</div>
+            {d&&<div style={{fontSize:10,color:c,marginTop:4}}>{d}</div>}
+            {l.includes('RATIO')&&<div style={{marginTop:6}}><Badge color={C.amber}>WARNING</Badge></div>}
+            {l.includes('RATIO')&&<div style={{fontSize:10,color:C.text3,marginTop:6}}>Systemic breach predicted in 7–14 days.</div>}
+          </Card>
+        ))}
+      </div>
+
+      {/* Debt trajectory chart */}
+      <Card style={{marginBottom:18}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:12}}>
+          <div>
+            <div style={{fontSize:11,fontWeight:700,marginBottom:2}}>Debt Trajectory & Risk Projection</div>
+            <div style={{fontSize:9,color:C.text3,...mono}}>INSTRUMENT: 12-MONTH ROLLING PROJECTION</div>
+          </div>
+          <div style={{display:'flex',gap:12,fontSize:9,...mono}}>
+            {[['CALCULATED',C.cyan],['TARGET',C.green],['RISK PROJ.',C.red]].map(([l,c])=>(
+              <div key={l} style={{display:'flex',alignItems:'center',gap:5,color:C.text3}}>
+                <div style={{width:16,height:2,background:c,borderRadius:1}}/>
+                {l}
+              </div>
+            ))}
+          </div>
+        </div>
+        <div style={{height:100}}>
+          <MiniChart points={[20,22,25,28,30,35,38,42,48,55,65,78,90]} color={C.cyan} height={100} fill/>
+        </div>
+        <div style={{display:'flex',justifyContent:'space-between',fontSize:9,color:C.text3,...mono,marginTop:4}}>
+          {['OCT 25','DEC 25','FEB 26','APR 26 (NOW)','JUN 26','AUG 26','OCT 26'].map(l=><span key={l}>{l}</span>)}
+        </div>
+      </Card>
+
+      {/* DAM table */}
+      <Card style={{marginBottom:18}}>
+        <SLabel right={<div style={{display:'flex',alignItems:'center',gap:5}}><Dot color={C.green} pulse/><span style={{fontSize:9,color:C.green,...mono}}>LIVE</span></div>}>
+          Decision Authority Matrix (DAM)
+        </SLabel>
+        <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+          <thead>
+            <tr style={{borderBottom:`1px solid ${C.border}`}}>
+              {['Decision Type','Authority Level','Threshold','Status','Auth. Score'].map(h=>(
+                <th key={h} style={{padding:'6px 10px',textAlign:'left',fontSize:8,color:C.text3,...mono,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.08em'}}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {DAM.map((row,i)=>(
+              <tr key={i} style={{borderBottom:`1px solid ${C.border}`}}>
+                <td style={{padding:'9px 10px',fontWeight:500}}>{row.decision}</td>
+                <td style={{padding:'9px 10px',color:C.cyan,...mono,fontSize:10}}>{row.level}</td>
+                <td style={{padding:'9px 10px',color:C.text3,fontSize:11}}>{row.threshold}</td>
+                <td style={{padding:'9px 10px'}}><Badge color={row.status==='ACTIVE'?C.green:C.amber}>{row.status}</Badge></td>
+                <td style={{padding:'9px 10px',width:130}}>
+                  <div style={{display:'flex',alignItems:'center',gap:7}}>
+                    <Bar value={row.auth*10} color={row.auth>=8?C.orange:C.cyan} h={3} style={{flex:1}}/>
+                    <span style={{fontSize:10,fontWeight:700,...mono,width:14}}>{row.auth}</span>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Card>
+
+      {/* Drift detection */}
+      <Card>
+        <SLabel>Drift Detection & Escalation Queue</SLabel>
+        {[{id:'DRF-041',t:'Budget Authority Creep',d:'Middle management approving purchases 23% above delegated threshold.',c:C.red},
+          {id:'DRF-038',t:'Policy Contradiction Detected',d:'Two active policies conflict on data retention for EU jurisdiction. S3 review flagged.',c:C.amber},
+          {id:'DRF-035',t:'Decision Velocity Anomaly',d:'Engineering team decision rate 3× above baseline. Technical debt accumulation risk.',c:C.orange}].map(d=>(
+          <div key={d.id} style={{display:'flex',gap:12,padding:'11px 0',borderBottom:`1px solid ${C.border}`}}>
+            <div style={{width:3,background:d.c,borderRadius:2,flexShrink:0,borderRadius:2}}/>
+            <div style={{flex:1}}>
+              <div style={{display:'flex',justifyContent:'space-between',marginBottom:3}}>
+                <span style={{fontSize:12,fontWeight:600}}>{d.t}</span>
+                <span style={{fontSize:8,color:C.text3,...mono}}>{d.id}</span>
+              </div>
+              <div style={{fontSize:11,color:C.text3,lineHeight:1.5}}>{d.d}</div>
+            </div>
+          </div>
+        ))}
+      </Card>
+    </div>
+
+    {/* Right panel */}
+    <div style={{width:200,borderLeft:`1px solid ${C.border}`,padding:14,overflowY:'auto',flexShrink:0}}>
+      <Card style={{marginBottom:12}}>
+        <SLabel>Confidence Score</SLabel>
+        <div style={{display:'flex',justifyContent:'center',marginBottom:10}}>
+          <svg width="78" height="78" viewBox="0 0 78 78">
+            <circle cx="39" cy="39" r="30" fill="none" stroke={C.border} strokeWidth="5"/>
+            <circle cx="39" cy="39" r="30" fill="none" stroke={C.cyan} strokeWidth="5"
+              strokeDasharray={`${2*Math.PI*30*0.75} ${2*Math.PI*30*0.25}`}
+              strokeDashoffset={2*Math.PI*30*0.25}
+              strokeLinecap="round" transform="rotate(-90 39 39)"/>
+            <text x="39" y="44" textAnchor="middle" fill={C.text1} fontSize="13" fontWeight="700" fontFamily="Space Grotesk">75%</text>
+          </svg>
+        </div>
+        <div style={{fontSize:10,color:C.text3,textAlign:'center',lineHeight:1.5}}>Based on 143 vector points across 12 asset classes.</div>
+      </Card>
+
+      <Card style={{marginBottom:12}}>
+        <SLabel>Recent Events</SLabel>
+        {[{l:'Systemic Lock-In Detected',s:'Migration Phase 2',c:C.green,i:'↗'},
+          {l:'Optionality Decay',s:'API Version Exclusivity',c:C.amber,i:'⚠'}].map(e=>(
+          <div key={e.l} style={{marginBottom:10}}>
+            <div style={{fontSize:11,fontWeight:600,color:e.c}}>{e.i} {e.l}</div>
+            <div style={{fontSize:10,color:C.text3}}>{e.s}</div>
+          </div>
+        ))}
+      </Card>
+
+      <Card style={{background:'transparent',border:`1px dashed ${C.border2}`}}>
+        <div style={{fontSize:8,color:C.text3,...mono,marginBottom:7,textAlign:'center',letterSpacing:'0.1em'}}>THE OBSERVER PERSPECTIVE</div>
+        <div style={{fontSize:12,color:C.text2,lineHeight:1.75,fontStyle:'italic',textAlign:'center'}}>"Decision intelligence isn't about being right; it's about being able to change your mind."</div>
+      </Card>
+    </div>
+  </div>
+);
+
+// ── WORKSPACE ─────────────────────────────────────────────────────────────
+const WS_CLUSTERS = [
+  { id:'HELIOS_X1',      sid:'0x442-SIM', status:'SIMULATING',    sc:C.cyan,
+    desc:'Cross-verification of decision pathway anomalies in Sector 7.',
+    progress:62, agents:3, humans:2, decision:'DEC-091', risk:'HIGH',
+    agentNames:['GPT-4o','Planner','Judge'] },
+  { id:'QUANTUM_ENTROPY',sid:'0x881-REV', status:'REVIEW NEEDED', sc:C.amber,
+    desc:'Cognitive bias detected in predictive modeling for policy shifts.',
+    progress:88, agents:2, humans:1, decision:'DEC-092', risk:'MED',
+    agentNames:['Inversion','Meta'] },
+  { id:'CORE_PROTOCOLS', sid:'0x119-STB', status:'STABLE',        sc:C.green,
+    desc:'Finalized logic gates for the decision engine authority architecture.',
+    progress:100, agents:1, humans:2, decision:'DEC-089', risk:'LOW',
+    agentNames:['Exegesis'] },
+  { id:'NEXUS_DELTA',    sid:'0x773-ACT', status:'ACTIVE',        sc:C.orange,
+    desc:'Real-time arbitration of competing infrastructure priorities across Q2.',
+    progress:34, agents:4, humans:3, decision:'DEC-094', risk:'HIGH',
+    agentNames:['GPT-4o','Planner','Counterfactual','Judge'] },
+  { id:'SIGMA_PRIME',    sid:'0x334-WAI', status:'AWAITING INPUT',sc:C.purple,
+    desc:'Series B valuation cap scenario modeling — awaiting CFO approval signal.',
+    progress:51, agents:2, humans:1, decision:'DEC-093', risk:'MED',
+    agentNames:['Inversion','Exegesis'] },
+  { id:'OBSERVER_7',     sid:'0x901-MON', status:'MONITORING',    sc:C.text2,
+    desc:'Passive audit of all active cluster decisions for S3 meta-layer compliance.',
+    progress:100, agents:1, humans:0, decision:'ALL', risk:'LOW',
+    agentNames:['Meta'] },
+];
+
+const WS_MEMBERS = [
+  { name:'Sarah K.',    type:'human',  color:C.orange, load:78, status:'REASONING_ACTIVE',  cluster:'HELIOS_X1',       tasks:['Bias review','Forward path sign-off'] },
+  { name:'K. Chen',     type:'human',  color:C.cyan,   load:45, status:'IN REVIEW',          cluster:'CORE_PROTOCOLS',  tasks:['Protocol validation'] },
+  { name:'M. Rodriguez',type:'human',  color:C.green,  load:91, status:'HEAVY_COMPUTE',      cluster:'NEXUS_DELTA',     tasks:['Constraint mapping','Scenario stress'] },
+  { name:'J. Park',     type:'human',  color:C.amber,  load:22, status:'STANDBY',            cluster:'SIGMA_PRIME',     tasks:[] },
+  { name:'GPT-4o',      type:'agent',  color:C.purple, load:84, status:'AGENT_ACTIVE',       cluster:'HELIOS_X1',       tasks:['Counterfactual gen','Inversion scan'] },
+  { name:'Planner',     type:'agent',  color:C.cyan,   load:67, status:'SCENARIO_SPLIT',     cluster:'NEXUS_DELTA',     tasks:['Path A/B/C branching'] },
+  { name:'Inversion',   type:'agent',  color:C.red,    load:92, status:'FAILURE_MODES',      cluster:'QUANTUM_ENTROPY', tasks:['Risk cascade map'] },
+  { name:'Meta',        type:'agent',  color:C.amber,  load:55, status:'CALIBRATION',        cluster:'OBSERVER_7',      tasks:['S3 compliance audit'] },
+  { name:'Exegesis',    type:'agent',  color:C.green,  load:38, status:'CONTEXT_RECALL',     cluster:'SIGMA_PRIME',     tasks:['Prior decision recall'] },
+];
+
+const WS_HANDOFFS = [
+  { from:'GPT-4o', fromType:'agent', to:'Sarah K.', toType:'human',
+    label:'HANDOFF REQUIRED', msg:'Counterfactual tree for DEC-091 has 3 unresolved branches. Human judgment needed on branch C — ethical dimension exceeds agent authority.', time:'14:28:11', cluster:'HELIOS_X1', color:C.amber, urgent:true },
+  { from:'Sarah K.', fromType:'human', to:'Planner', toType:'agent',
+    label:'TASK DELEGATED', msg:'Delegating Path A scenario decomposition to Planner. Constraint: latency floor 280ms. Generate 4 sub-steps and return for review.', time:'13:55:02', cluster:'NEXUS_DELTA', color:C.cyan, urgent:false },
+  { from:'Inversion', fromType:'agent', to:'M. Rodriguez', toType:'human',
+    label:'ESCALATION', msg:'Failure cascade probability exceeds 0.40 threshold in QUANTUM_ENTROPY. Requires human override or explicit risk acceptance before simulation continues.', time:'12:10:44', cluster:'QUANTUM_ENTROPY', color:C.red, urgent:true },
+  { from:'K. Chen', fromType:'human', to:'Meta', toType:'agent',
+    label:'AUDIT REQUEST', msg:'Requesting S3 meta-layer audit of CORE_PROTOCOLS before final commit. Verify calibration delta and bias scores against threshold.', time:'11:42:19', cluster:'CORE_PROTOCOLS', color:C.purple, urgent:false },
+  { from:'Meta', fromType:'agent', to:'J. Park', toType:'human',
+    label:'INSIGHT SURFACED', msg:'Series B valuation modeling in SIGMA_PRIME shows anchoring bias (0.047) above threshold. Recommend CFO review before term sheet engagement.', time:'10:14:55', cluster:'SIGMA_PRIME', color:C.green, urgent:false },
+];
+
+const WS_FEED = [
+  { actor:'GPT-4o Agent', type:'agent', time:'14:22:05', cluster:'HELIOS_X1',
+    body:'Forward path decomposition complete. Confidence on Path A: ', highlight:'91.2%',
+    tags:['HIGH CONF','HELIOS_X1'], isErr:false },
+  { actor:'Sarah K. (Human)', type:'human', time:'14:19:41', cluster:'HELIOS_X1',
+    body:'Reviewed Planner output — accepting Path A with one modification. Updating constraint on latency from 300ms to 280ms.',
+    tags:['CONSTRAINT_UPDATE'], isErr:false },
+  { actor:'Inversion Agent', type:'agent', time:'13:48:20', cluster:'QUANTUM_ENTROPY',
+    body:'Failure cascade scan complete. ERR: probability exceeds safe threshold.',
+    tags:[], isErr:true, errLabel:'RISK THRESHOLD BREACH', errDetail:'P(cascade) = 0.41 > floor(0.40) — human override required' },
+  { actor:'M. Rodriguez (Human)', type:'human', time:'13:12:03', cluster:'NEXUS_DELTA',
+    body:'Constraint space mapped. 4 hard constraints identified, 2 soft. Handing off to Planner for scenario branching.',
+    tags:['ACTION_ITEM','NEXUS_DELTA'], isErr:false },
+  { actor:'Planner Agent', type:'agent', time:'12:55:30', cluster:'NEXUS_DELTA',
+    body:'Received delegation from M. Rodriguez. Generating 3-branch scenario tree for DEC-094. ETA: ', highlight:'4 min',
+    tags:['TASK_ACTIVE'], isErr:false },
+  { actor:'Meta Agent', type:'agent', time:'11:50:08', cluster:'OBSERVER_7',
+    body:'S3 compliance audit complete across 6 active clusters. 1 calibration drift detected in QUANTUM_ENTROPY. Surfacing to human layer.',
+    tags:['S3_AUDIT','ALL_CLUSTERS'], isErr:false },
+  { actor:'K. Chen (Human)', type:'human', time:'09:32:16', cluster:'CORE_PROTOCOLS',
+    body:'Protocol validation signed off. CORE_PROTOCOLS moving to STABLE status. Excellent work from Exegesis on context reconstruction.',
+    tags:['COMPLETED'], isErr:false },
+];
+
+const ClusterTopology = ({ clusters, active, onSelect }) => {
+  const positions = [
+    [120,80],[300,60],[480,90],[160,200],[340,210],[480,190],
+  ];
+  const edges = [[0,1],[1,2],[0,3],[1,3],[1,4],[2,5],[3,4],[4,5]];
+  return (
+    <svg width="100%" height="100%" viewBox="0 0 600 280" preserveAspectRatio="xMidYMid meet">
+      {/* grid dots */}
+      {Array.from({length:8},(_,r)=>Array.from({length:16},(_,c)=>(
+        <circle key={`${r}-${c}`} cx={c*40+10} cy={r*36+10} r={1} fill={C.border} opacity={0.4}/>
+      )))}
+      {/* edges */}
+      {edges.map(([a,b],i)=>(
+        <line key={i} x1={positions[a][0]} y1={positions[a][1]} x2={positions[b][0]} y2={positions[b][1]}
+          stroke={C.border2} strokeWidth="1" strokeDasharray="4 4" opacity={0.6}/>
+      ))}
+      {/* nodes */}
+      {clusters.map((cl,i)=>{
+        const [x,y]=positions[i]||[300,140];
+        const isActive = cl.id===active;
+        const r = isActive ? 24 : 18;
+        return (
+          <g key={cl.id} onClick={()=>onSelect(cl.id)} style={{cursor:'pointer'}}>
+            <circle cx={x} cy={y} r={r+8} fill={`${cl.sc}08`} opacity={isActive?1:0}/>
+            <circle cx={x} cy={y} r={r} fill={`${cl.sc}22`} stroke={cl.sc} strokeWidth={isActive?2:1} opacity={isActive?1:0.7}/>
+            {cl.status==='SIMULATING'&&<circle cx={x} cy={y} r={r+14} fill="none" stroke={cl.sc} strokeWidth="0.5" opacity={0.3}/>}
+            <text x={x} y={y+4} textAnchor="middle" fill={cl.sc} fontSize={isActive?10:8} fontWeight="700" fontFamily="Space Mono">{cl.id.split('_')[0]}</text>
+            <text x={x} y={y+r+14} textAnchor="middle" fill={C.text3} fontSize="7" fontFamily="Space Mono">{cl.status}</text>
+            {/* member pips */}
+            {Array.from({length:Math.min(cl.agents+cl.humans,5)},(_,j)=>(
+              <circle key={j} cx={x-10+j*5} cy={y+r+22} r={2.5}
+                fill={j<cl.agents?cl.sc:C.orange} opacity={0.8}/>
+            ))}
+          </g>
+        );
+      })}
+      {/* Legend */}
+      <g transform="translate(10,250)">
+        <circle cx={6} cy={6} r={3} fill={C.purple}/>
+        <text x={12} y={10} fill={C.text3} fontSize="7" fontFamily="Space Mono">AGENT</text>
+        <circle cx={52} cy={6} r={3} fill={C.orange}/>
+        <text x={58} y={10} fill={C.text3} fontSize="7" fontFamily="Space Mono">HUMAN</text>
+      </g>
+    </svg>
+  );
+};
+
+const Workspace = () => {
+  const [banner, setBanner] = useState(true);
+  const [activeCluster, setActiveCluster] = useState('HELIOS_X1');
+  const [view, setView] = useState('feed');
+  const [feedInput, setFeedInput] = useState('');
+  const [extraFeed, setExtraFeed] = useState([]);
+  const [assignAgent, setAssignAgent] = useState(null);
+
+  const sendMsg = () => {
+    if (!feedInput.trim()) return;
+    setExtraFeed(f=>[{actor:'ANALYST_D1',type:'human',time:new Date().toTimeString().slice(0,8),
+      cluster:activeCluster,body:feedInput,tags:[activeCluster],isErr:false},...f]);
+    setFeedInput('');
+  };
+
+  const cl = WS_CLUSTERS.find(c=>c.id===activeCluster)||WS_CLUSTERS[0];
+  const clusterFeed = view==='feed'
+    ? [...extraFeed,...WS_FEED].filter(f=>f.cluster===activeCluster||extraFeed.includes(f))
+    : [];
+  const allFeed = [...extraFeed,...WS_FEED];
+  const clusterMembers = WS_MEMBERS.filter(m=>m.cluster===activeCluster);
+  const urgentHandoffs = WS_HANDOFFS.filter(h=>h.urgent&&h.cluster===activeCluster);
+
+  return (
+    <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
+      {/* Banner */}
+      {banner&&(
+        <div style={{borderBottom:`1px solid ${C.border}`,background:`${C.amber}0c`,
+          padding:'9px 20px',display:'flex',alignItems:'center',gap:12,flexShrink:0}}>
+          <div style={{width:22,height:22,borderRadius:4,background:`${C.amber}25`,border:`1px solid ${C.amber}50`,
+            display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,flexShrink:0}}>⚠</div>
+          <div style={{flex:1,fontSize:12}}>
+            <span style={{color:C.amber,fontWeight:700}}>ESCALATION REQUIRED · </span>
+            <span style={{color:C.text2}}>Inversion Agent flagged risk threshold breach in </span>
+            <span style={{color:C.cyan,fontWeight:600}}>QUANTUM_ENTROPY</span>
+            <span style={{color:C.text2}}> — human override needed before simulation resumes.</span>
+          </div>
+          <Btn sm onClick={()=>setActiveCluster('QUANTUM_ENTROPY')}>OPEN CLUSTER</Btn>
+          <Btn sm onClick={()=>setBanner(false)}>DISMISS</Btn>
+        </div>
+      )}
+
+      <div style={{display:'flex',flex:1,overflow:'hidden'}}>
+        {/* ── LEFT: topology + cluster list ── */}
+        <div style={{width:230,borderRight:`1px solid ${C.border}`,display:'flex',flexDirection:'column',flexShrink:0}}>
+          {/* Topology view */}
+          <div style={{height:200,borderBottom:`1px solid ${C.border}`,background:C.bg,position:'relative',flexShrink:0}}>
+            <div style={{position:'absolute',top:6,left:10,fontSize:8,color:C.text3,...mono,letterSpacing:'0.08em'}}>CLUSTER TOPOLOGY</div>
+            <ClusterTopology clusters={WS_CLUSTERS} active={activeCluster} onSelect={setActiveCluster}/>
+          </div>
+          {/* Cluster list */}
+          <div style={{flex:1,overflowY:'auto',padding:'8px 8px'}}>
+            {WS_CLUSTERS.map(c=>(
+              <div key={c.id} onClick={()=>setActiveCluster(c.id)} style={{
+                padding:'8px 10px',borderRadius:5,marginBottom:4,cursor:'pointer',
+                background:activeCluster===c.id?C.card2:'transparent',
+                border:`1px solid ${activeCluster===c.id?C.border2:C.border}`,
+                borderLeft:`3px solid ${activeCluster===c.id?C.orange:c.sc}`,
+                transition:'all 0.12s'}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:3}}>
+                  <span style={{fontSize:11,fontWeight:700,color:activeCluster===c.id?C.text1:C.text2}}>{c.id}</span>
+                  <Badge color={c.sc}>{c.status.split(' ')[0]}</Badge>
+                </div>
+                <div style={{display:'flex',alignItems:'center',gap:8}}>
+                  <Bar value={c.progress} color={c.sc} h={2} style={{flex:1}}/>
+                  <span style={{fontSize:8,...mono,color:c.sc,flexShrink:0}}>{c.progress}%</span>
+                </div>
+                <div style={{display:'flex',justifyContent:'space-between',marginTop:4,fontSize:8,color:C.text3,...mono}}>
+                  <span>⬡{c.agents} AGENTS</span>
+                  <span>👤{c.humans} HUMANS</span>
+                  <span style={{color:c.risk==='HIGH'?C.red:c.risk==='MED'?C.amber:C.green}}>{c.risk}</span>
+                </div>
+              </div>
+            ))}
+            <div style={{padding:'10px',border:`1px dashed ${C.border2}`,borderRadius:5,
+              cursor:'pointer',textAlign:'center',marginTop:4}}>
+              <span style={{fontSize:11,color:C.text3,...mono}}>⊕ NEW CLUSTER</span>
+            </div>
+          </div>
+        </div>
+
+        {/* ── CENTER ── */}
+        <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden',minWidth:0}}>
+          {/* Cluster header */}
+          <div style={{padding:'12px 18px',borderBottom:`1px solid ${C.border}`,background:C.card2,flexShrink:0}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:8}}>
+              <div>
+                <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:2}}>
+                  <div style={{width:8,height:8,borderRadius:'50%',background:cl.sc}}/>
+                  <span style={{fontSize:16,fontWeight:700}}>{cl.id}</span>
+                  <Badge color={cl.sc}>{cl.status}</Badge>
+                  {urgentHandoffs.length>0&&<Badge color={C.red}>⚠ {urgentHandoffs.length} URGENT</Badge>}
+                </div>
+                <div style={{fontSize:8,color:C.text3,...mono,marginBottom:4}}>ID: {cl.sid} · DECISION: {cl.decision}</div>
+                <div style={{fontSize:12,color:C.text2}}>{cl.desc}</div>
+              </div>
+              <div style={{display:'flex',gap:6,flexShrink:0}}>
+                <Btn sm>⊕ ADD AGENT</Btn>
+                <Btn sm primary>▶ RUN SIM</Btn>
+              </div>
+            </div>
+            {/* Progress + team pips */}
+            <div style={{display:'flex',alignItems:'center',gap:12}}>
+              <div style={{flex:1}}>
+                <div style={{display:'flex',justifyContent:'space-between',marginBottom:3}}>
+                  <span style={{fontSize:8,color:C.text3,...mono}}>CLUSTER PROGRESS</span>
+                  <span style={{fontSize:8,color:cl.sc,...mono}}>{cl.progress}%</span>
+                </div>
+                <Bar value={cl.progress} color={cl.sc} h={4}/>
+              </div>
+              <div style={{display:'flex',gap:0,flexShrink:0}}>
+                {clusterMembers.map((m,i)=>(
+                  <div key={m.name} style={{width:24,height:24,borderRadius:'50%',
+                    background:`${m.color}35`,border:`2px solid ${C.card2}`,
+                    marginLeft:i?-8:0,display:'flex',alignItems:'center',
+                    justifyContent:'center',fontSize:9,color:m.color,fontWeight:700,
+                    title:m.name}}>
+                    {m.type==='agent'?'⬡':m.name[0]}
+                  </div>
+                ))}
+                <div style={{fontSize:9,color:C.text3,...mono,marginLeft:6,lineHeight:'24px'}}>
+                  {cl.agents}A · {cl.humans}H
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* View tabs */}
+          <div style={{display:'flex',borderBottom:`1px solid ${C.border}`,background:C.card2,flexShrink:0}}>
+            {[['feed','Intelligence Feed'],['handoffs','Handoffs'],['all','All Clusters']].map(([v,l])=>(
+              <div key={v} onClick={()=>setView(v)} style={{
+                padding:'8px 16px',cursor:'pointer',fontSize:11,fontWeight:500,
+                color:view===v?C.orange:C.text3,
+                borderBottom:`2px solid ${view===v?C.orange:'transparent'}`,
+                marginBottom:-1,transition:'color 0.12s'}}>
+                {l}
+              </div>
+            ))}
+          </div>
+
+          {/* Feed */}
+          <div style={{flex:1,overflowY:'auto',padding:'0 18px'}}>
+            {view==='feed' && (
+              <>
+                {(cl.progress<100&&cl.status!=='STABLE')&&(
+                  <div style={{padding:'10px 14px',margin:'12px 0',background:`${cl.sc}0c`,
+                    border:`1px solid ${cl.sc}30`,borderRadius:5,display:'flex',alignItems:'center',gap:10}}>
+                    <span style={{fontSize:13,color:cl.sc}}>⟳</span>
+                    <div style={{flex:1}}>
+                      <span style={{fontSize:11,color:cl.sc,fontWeight:600}}>Active agents: </span>
+                      <span style={{fontSize:11,color:C.text2}}>{cl.agentNames.join(' · ')}</span>
+                    </div>
+                    <Badge color={cl.sc}>RUNNING</Badge>
+                  </div>
+                )}
+                {allFeed.filter(f=>f.cluster===cl.id).map((item,i)=>(
+                  <FeedItem key={i} item={item}/>
+                ))}
+                {allFeed.filter(f=>f.cluster===cl.id).length===0&&(
+                  <div style={{padding:'40px 0',textAlign:'center',color:C.text3,fontSize:12}}>
+                    No activity yet in this cluster. Push an update to begin.
+                  </div>
+                )}
+              </>
+            )}
+            {view==='handoffs' && (
+              <div style={{paddingTop:12}}>
+                {WS_HANDOFFS.filter(h=>h.cluster===cl.id).length===0
+                  ? <div style={{padding:'40px 0',textAlign:'center',color:C.text3,fontSize:12}}>No handoffs for this cluster.</div>
+                  : WS_HANDOFFS.filter(h=>h.cluster===cl.id).map((h,i)=>(
+                  <div key={i} style={{marginBottom:14,padding:14,background:C.card,
+                    border:`1px solid ${h.urgent?h.color+'44':C.border}`,borderRadius:6,
+                    borderLeft:`3px solid ${h.color}`}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+                      <div style={{display:'flex',alignItems:'center',gap:8}}>
+                        <div style={{display:'flex',alignItems:'center',gap:5}}>
+                          <div style={{width:20,height:20,borderRadius:'50%',
+                            background:h.fromType==='agent'?`${C.purple}30`:`${C.orange}30`,
+                            display:'flex',alignItems:'center',justifyContent:'center',
+                            fontSize:9,color:h.fromType==='agent'?C.purple:C.orange}}>
+                            {h.fromType==='agent'?'⬡':'H'}
+                          </div>
+                          <span style={{fontSize:11,fontWeight:600}}>{h.from}</span>
+                        </div>
+                        <span style={{fontSize:12,color:C.text3}}>→</span>
+                        <div style={{display:'flex',alignItems:'center',gap:5}}>
+                          <div style={{width:20,height:20,borderRadius:'50%',
+                            background:h.toType==='agent'?`${C.purple}30`:`${C.orange}30`,
+                            display:'flex',alignItems:'center',justifyContent:'center',
+                            fontSize:9,color:h.toType==='agent'?C.purple:C.orange}}>
+                            {h.toType==='agent'?'⬡':'H'}
+                          </div>
+                          <span style={{fontSize:11,fontWeight:600}}>{h.to}</span>
+                        </div>
+                      </div>
+                      <div style={{display:'flex',gap:6,alignItems:'center'}}>
+                        <Badge color={h.color}>{h.label}</Badge>
+                        <span style={{fontSize:9,color:C.text3,...mono}}>{h.time}</span>
+                      </div>
+                    </div>
+                    <div style={{fontSize:12,color:C.text2,lineHeight:1.6,marginBottom:h.urgent?10:0}}>{h.msg}</div>
+                    {h.urgent&&(
+                      <div style={{display:'flex',gap:7}}>
+                        <Btn sm primary>ACCEPT & RESPOND</Btn>
+                        <Btn sm>DELEGATE BACK</Btn>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            {view==='all' && (
+              <div style={{paddingTop:12}}>
+                {allFeed.map((item,i)=><FeedItem key={i} item={item} showCluster/>)}
+              </div>
+            )}
+          </div>
+
+          {/* Compose */}
+          <div style={{padding:'10px 18px',borderTop:`1px solid ${C.border}`,display:'flex',gap:8,flexShrink:0,background:C.card2}}>
+            <div style={{width:24,height:24,borderRadius:'50%',background:`${C.orange}30`,border:`1px solid ${C.orange}50`,
+              display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,color:C.orange,flexShrink:0}}>D</div>
+            <input value={feedInput} onChange={e=>setFeedInput(e.target.value)}
+              onKeyDown={e=>e.key==='Enter'&&sendMsg()}
+              placeholder={`Push to ${activeCluster}...`}
+              style={{flex:1,background:C.card,border:`1px solid ${C.border2}`,borderRadius:4,
+                padding:'5px 12px',fontSize:12,color:C.text1,outline:'none'}}/>
+            <Btn sm style={{flexShrink:0}}>@AGENT</Btn>
+            <Btn sm primary onClick={sendMsg}>PUSH</Btn>
+          </div>
+        </div>
+
+        {/* ── RIGHT ── */}
+        <div style={{width:218,borderLeft:`1px solid ${C.border}`,overflowY:'auto',padding:12,flexShrink:0}}>
+          {/* Network status */}
+          <div style={{marginBottom:14}}>
+            <SLabel right={<div style={{display:'flex',gap:4,alignItems:'center'}}><Dot color={C.green} pulse/><span style={{fontSize:8,color:C.green,...mono}}>LIVE</span></div>}>
+              Agent Network
+            </SLabel>
+            {WS_MEMBERS.filter(m=>m.type==='agent').map(a=>(
+              <div key={a.name} style={{marginBottom:10}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:2}}>
+                  <div style={{display:'flex',alignItems:'center',gap:6}}>
+                    <div style={{width:20,height:20,borderRadius:'50%',background:`${a.color}25`,
+                      border:`1px solid ${a.color}50`,display:'flex',alignItems:'center',
+                      justifyContent:'center',fontSize:9,color:a.color,flexShrink:0}}>⬡</div>
+                    <div>
+                      <div style={{fontSize:11,fontWeight:600,lineHeight:1.1}}>{a.name}</div>
+                      <div style={{fontSize:8,color:C.text3,...mono}}>{a.cluster}</div>
+                    </div>
+                  </div>
+                  <span style={{fontSize:9,fontWeight:700,color:a.load>80?C.red:a.load>50?C.amber:C.green,...mono}}>{a.load}%</span>
+                </div>
+                <Bar value={a.load} color={a.load>80?C.red:a.load>50?C.amber:C.green} h={2}/>
+                <div style={{fontSize:8,color:C.text3,marginTop:2,...mono}}>{a.status}</div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{borderTop:`1px solid ${C.border}`,paddingTop:12,marginBottom:14}}>
+            <SLabel>Human Analysts</SLabel>
+            {WS_MEMBERS.filter(m=>m.type==='human').map(h=>(
+              <div key={h.name} style={{marginBottom:9}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:2}}>
+                  <div style={{display:'flex',alignItems:'center',gap:6}}>
+                    <div style={{width:20,height:20,borderRadius:'50%',background:`${h.color}25`,
+                      border:`1px solid ${h.color}50`,display:'flex',alignItems:'center',
+                      justifyContent:'center',fontSize:9,color:h.color,fontWeight:700,flexShrink:0}}>
+                      {h.name[0]}
+                    </div>
+                    <div>
+                      <div style={{fontSize:11,fontWeight:600,lineHeight:1.1}}>{h.name}</div>
+                      <div style={{fontSize:8,color:C.text3,...mono}}>{h.cluster}</div>
+                    </div>
+                  </div>
+                  <Dot color={h.load>70?C.amber:C.green}/>
+                </div>
+                {h.tasks.length>0&&h.tasks.map(t=>(
+                  <div key={t} style={{fontSize:9,color:C.text3,paddingLeft:26,marginBottom:2,display:'flex',alignItems:'center',gap:4}}>
+                    <span style={{color:C.border2}}>·</span>{t}
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+
+          <div style={{borderTop:`1px solid ${C.border}`,paddingTop:12,marginBottom:14}}>
+            <SLabel right={<Badge color={C.amber}>{WS_HANDOFFS.filter(h=>h.urgent).length} URGENT</Badge>}>Pending Handoffs</SLabel>
+            {WS_HANDOFFS.slice(0,3).map((h,i)=>(
+              <div key={i} style={{padding:'8px 10px',background:h.urgent?`${h.color}0c`:C.card2,
+                border:`1px solid ${h.urgent?h.color+'33':C.border}`,borderRadius:4,marginBottom:7}}>
+                <div style={{fontSize:9,color:h.color,fontWeight:700,...mono,marginBottom:2}}>{h.label}</div>
+                <div style={{fontSize:9,color:C.text2,lineHeight:1.4,marginBottom:3}}>
+                  <span style={{color:C.text1}}>{h.from}</span> → <span style={{color:C.text1}}>{h.to}</span>
+                </div>
+                <div style={{fontSize:8,color:C.text3,...mono}}>{h.cluster} · {h.time}</div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{borderTop:`1px solid ${C.border}`,paddingTop:12}}>
+            <SLabel>Hub Operations</SLabel>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:7}}>
+              {[['⇪','EXPORT'],['⟳','RE-SYNC'],['⬡','SPAWN'],['📡','COMM']].map(([icon,label])=>(
+                <div key={label} style={{padding:'9px 6px',background:C.card2,border:`1px solid ${C.border}`,
+                  borderRadius:4,cursor:'pointer',textAlign:'center'}}>
+                  <div style={{fontSize:14,marginBottom:3}}>{icon}</div>
+                  <div style={{fontSize:7,color:C.text3,...mono}}>{label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const FeedItem = ({ item, showCluster }) => (
+  <div style={{display:'flex',gap:12,padding:'13px 0',borderBottom:`1px solid ${C.border}`}}>
+    <div style={{width:30,height:30,borderRadius:'50%',flexShrink:0,
+      background:item.type==='agent'?`${C.purple}25`:`${C.orange}25`,
+      border:`1px solid ${item.type==='agent'?C.purple:C.orange}40`,
+      display:'flex',alignItems:'center',justifyContent:'center',
+      fontSize:11,color:item.type==='agent'?C.purple:C.orange}}>
+      {item.type==='agent'?'⬡':'H'}
+    </div>
+    <div style={{flex:1,minWidth:0}}>
+      <div style={{display:'flex',justifyContent:'space-between',marginBottom:3,gap:8}}>
+        <div style={{display:'flex',alignItems:'center',gap:7,flexWrap:'wrap'}}>
+          <span style={{fontSize:12,fontWeight:600}}>{item.actor}</span>
+          {showCluster&&<Badge color={C.text3}>{item.cluster}</Badge>}
+        </div>
+        <span style={{fontSize:9,color:C.text3,...mono,flexShrink:0}}>{item.time}</span>
+      </div>
+      <div style={{fontSize:12,color:C.text2,lineHeight:1.6,marginBottom:item.tags?.length||item.isErr?7:0}}>
+        {item.body}{item.highlight&&<span style={{color:C.cyan,fontWeight:600,...mono}}>{item.highlight}</span>}
+      </div>
+      {item.isErr&&(
+        <div style={{padding:'7px 11px',background:`${C.amber}0f`,border:`1px solid ${C.amber}33`,borderRadius:4,marginBottom:6}}>
+          <div style={{fontSize:8,color:C.amber,fontWeight:700,...mono,marginBottom:2}}>⚠ {item.errLabel}</div>
+          <div style={{fontSize:9,color:C.text3,...mono}}>{item.errDetail}</div>
+        </div>
+      )}
+      {item.tags?.length>0&&(
+        <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
+          {item.tags.map(t=><Badge key={t} color={C.text3}>{t}</Badge>)}
+        </div>
+      )}
+    </div>
+  </div>
+);
+
+// ── DECISION WIZARD ───────────────────────────────────────────────────────
+const WIZARD_STEPS = [
+  { id:'define',    num:'01', label:'Define',        icon:'◇', sub:'Name & scope your decision' },
+  { id:'frame',     num:'02', label:'Frame',         icon:'⬡', sub:'Assess gravity dimensions' },
+  { id:'actors',    num:'03', label:'Actors',        icon:'◎', sub:'Map people, agents & stakes' },
+  { id:'simulate',  num:'04', label:'Simulate',      icon:'⊕', sub:'Run forward scenarios' },
+  { id:'invert',    num:'05', label:'Stress Test',   icon:'⊗', sub:'Inversion & failure modes' },
+  { id:'judge',     num:'06', label:'Judge',         icon:'◈', sub:'Routing verdict & conditions' },
+  { id:'commit',    num:'07', label:'Commit',        icon:'✦', sub:'Log & assign ownership' },
+];
+
+const WizardStepBar = ({ current, onNav, data }) => (
+  <div style={{ display:'flex', alignItems:'stretch', borderBottom:`1px solid ${C.border}`, background:C.card2, flexShrink:0, overflowX:'auto' }}>
+    {WIZARD_STEPS.map((s, i) => {
+      const idx = WIZARD_STEPS.findIndex(x => x.id === current);
+      const done = i < idx;
+      const active = s.id === current;
+      const locked = i > idx + 1;
+      return (
+        <div key={s.id} onClick={() => !locked && onNav(s.id)}
+          style={{ flex:1, minWidth:100, padding:'12px 14px', cursor: locked ? 'default' : 'pointer',
+            borderBottom:`2px solid ${active ? C.orange : done ? C.green : 'transparent'}`,
+            marginBottom:-1, opacity: locked ? 0.35 : 1, transition:'all 0.15s',
+            background: active ? `${C.orange}0c` : 'transparent' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:3 }}>
+            <div style={{ width:18, height:18, borderRadius:'50%', flexShrink:0,
+              background: active ? C.orange : done ? C.green : C.border2,
+              display:'flex', alignItems:'center', justifyContent:'center',
+              fontSize:9, fontWeight:700, color:'#fff', ...mono }}>
+              {done ? '✓' : s.num}
+            </div>
+            <span style={{ fontSize:11, fontWeight: active ? 700 : 500,
+              color: active ? C.orange : done ? C.green : C.text2 }}>{s.label}</span>
+          </div>
+          <div style={{ fontSize:9, color:C.text3, paddingLeft:25 }}>{s.sub}</div>
+        </div>
+      );
+    })}
+  </div>
+);
+
+const DecisionWizard = () => {
+  const [step, setStep]     = useState('define');
+  const [data, setData]     = useState({
+    title:'', context:'', decisionType:'strategic',
+    impact:5, urgency:5, uncertainty:5, irreversibility:5,
+    actors:[{name:'', role:'human', stake:''}],
+    assumptions:[''],
+    constraints:[''],
+    scenarioA:'', scenarioB:'', scenarioC:'',
+    invertRisk:'', invertCascade:'',
+    counterfactuals:[''],
+    routing:'', conditions:[''],
+    owner:'', deadline:'', notes:'',
+  });
+  const [submitted, setSubmitted] = useState(false);
+
+  const set = (key, val) => setData(d => ({...d, [key]: val}));
+  const gravity = ((data.impact + data.urgency + data.uncertainty + data.irreversibility) / 4).toFixed(1);
+  const gravityColor = gravity >= 7 ? C.red : gravity >= 5 ? C.amber : C.cyan;
+
+  const stepIdx = WIZARD_STEPS.findIndex(s => s.id === step);
+  const next = () => { if (stepIdx < WIZARD_STEPS.length - 1) setStep(WIZARD_STEPS[stepIdx + 1].id); };
+  const back = () => { if (stepIdx > 0) setStep(WIZARD_STEPS[stepIdx - 1].id); };
+
+  const inputStyle = {
+    background: C.card2, border:`1px solid ${C.border2}`, borderRadius:4,
+    padding:'8px 12px', fontSize:12, color:C.text1, width:'100%', outline:'none',
+    fontFamily:'Space Grotesk, sans-serif',
+  };
+  const labelStyle = { fontSize:9, color:C.text3, ...mono, letterSpacing:'0.08em', marginBottom:5, display:'block' };
+  const Field = ({ label, children }) => (
+    <div style={{ marginBottom:16 }}>
+      <span style={labelStyle}>{label}</span>
+      {children}
+    </div>
+  );
+
+  if (submitted) return (
+    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
+      height:'100%', gap:18, padding:40, textAlign:'center' }}>
+      <div style={{ width:64, height:64, borderRadius:'50%', background:`${C.green}25`,
+        border:`2px solid ${C.green}`, display:'flex', alignItems:'center',
+        justifyContent:'center', fontSize:28 }}>✓</div>
+      <div style={{ fontSize:22, fontWeight:700 }}>Decision Logged</div>
+      <div style={{ fontSize:13, color:C.text3, maxWidth:420, lineHeight:1.7 }}>
+        <strong style={{ color:C.text1 }}>{data.title || 'Untitled Decision'}</strong> has been committed to the Decision Log with routing verdict <strong style={{ color:data.routing==='ACT'?C.green:data.routing==='ESCALATE'?C.red:C.text2 }}>{data.routing||'DEFER'}</strong>.
+        Assigned to <strong style={{ color:C.orange }}>{data.owner||'Unassigned'}</strong>.
+      </div>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12, width:'100%', maxWidth:480 }}>
+        {[['Gravity Score', gravity, gravityColor],
+          ['Confidence', `${Math.round(60 + parseFloat(gravity)*4)}%`, C.cyan],
+          ['Routing', data.routing||'DEFER', data.routing==='ACT'?C.green:data.routing==='ESCALATE'?C.red:C.text3]
+        ].map(([l,v,c]) => (
+          <Card key={l} style={{ padding:'12px 14px', textAlign:'center' }}>
+            <div style={{ fontSize:8, color:C.text3, ...mono, marginBottom:4 }}>{l}</div>
+            <div style={{ fontSize:20, fontWeight:700, color:c }}>{v}</div>
+          </Card>
+        ))}
+      </div>
+      <div style={{ display:'flex', gap:10 }}>
+        <Btn onClick={() => { setSubmitted(false); setStep('define'); setData({
+          title:'', context:'', decisionType:'strategic',
+          impact:5, urgency:5, uncertainty:5, irreversibility:5,
+          actors:[{name:'', role:'human', stake:''}], assumptions:[''], constraints:[''],
+          scenarioA:'', scenarioB:'', scenarioC:'', invertRisk:'', invertCascade:'',
+          counterfactuals:[''], routing:'', conditions:[''], owner:'', deadline:'', notes:'',
+        }); }}>START NEW DECISION</Btn>
+        <Btn primary>VIEW IN LOG →</Btn>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', height:'100%', overflow:'hidden' }}>
+      <WizardStepBar current={step} onNav={setStep} data={data}/>
+
+      <div style={{ flex:1, display:'flex', overflow:'hidden' }}>
+        {/* Main content */}
+        <div style={{ flex:1, overflowY:'auto', padding:'28px 36px' }}>
+          {step === 'define' && (
+            <div style={{ maxWidth:620 }}>
+              <div style={{ fontSize:18, fontWeight:700, marginBottom:4 }}>Define the Decision</div>
+              <div style={{ fontSize:12, color:C.text3, marginBottom:24 }}>Capture the core context before any analysis begins.</div>
+              <Field label="DECISION TITLE">
+                <input value={data.title} onChange={e=>set('title',e.target.value)}
+                  placeholder="e.g. Migrate infrastructure to ARM-64"
+                  style={inputStyle}/>
+              </Field>
+              <Field label="CONTEXT — What has changed that makes this a decision now?">
+                <textarea value={data.context} onChange={e=>set('context',e.target.value)}
+                  rows={4} placeholder="Describe the triggering event, prior state, and current situation..."
+                  style={{...inputStyle, resize:'vertical', lineHeight:1.6}}/>
+              </Field>
+              <Field label="DECISION TYPE">
+                <div style={{ display:'flex', gap:8 }}>
+                  {['strategic','operational','tactical','ethical'].map(t => (
+                    <div key={t} onClick={() => set('decisionType', t)} style={{
+                      padding:'7px 14px', borderRadius:4, cursor:'pointer', fontSize:11,
+                      fontWeight:data.decisionType===t?700:400, textTransform:'capitalize',
+                      background:data.decisionType===t?`${C.orange}18`:'transparent',
+                      border:`1px solid ${data.decisionType===t?C.orange:C.border2}`,
+                      color:data.decisionType===t?C.orange:C.text2, transition:'all 0.12s' }}>
+                      {t}
+                    </div>
+                  ))}
+                </div>
+              </Field>
+              <Field label="CONSTRAINTS (add one per line)">
+                {data.constraints.map((c,i) => (
+                  <div key={i} style={{ display:'flex', gap:7, marginBottom:7 }}>
+                    <input value={c} onChange={e=>{const a=[...data.constraints];a[i]=e.target.value;set('constraints',a);}}
+                      placeholder={`Constraint ${i+1}...`} style={{...inputStyle, flex:1}}/>
+                    {i===data.constraints.length-1 &&
+                      <Btn sm onClick={()=>set('constraints',[...data.constraints,''])}>+</Btn>}
+                  </div>
+                ))}
+              </Field>
+            </div>
+          )}
+
+          {step === 'frame' && (
+            <div style={{ maxWidth:620 }}>
+              <div style={{ fontSize:18, fontWeight:700, marginBottom:4 }}>Frame the Decision</div>
+              <div style={{ fontSize:12, color:C.text3, marginBottom:24 }}>Score four gravity dimensions. These drive the DAM routing verdict.</div>
+              {[
+                ['IMPACT', 'impact', 'How significant are the consequences if this goes wrong or right?', C.red],
+                ['URGENCY', 'urgency', 'How time-sensitive is the decision window?', C.amber],
+                ['UNCERTAINTY', 'uncertainty', 'How much is unknown or contested?', C.purple],
+                ['IRREVERSIBILITY', 'irreversibility', 'How hard is it to undo this once committed?', C.orange],
+              ].map(([l, key, desc, c]) => (
+                <div key={key} style={{ marginBottom:22 }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
+                    <span style={{ fontSize:9, color:C.text3, ...mono }}>{l}</span>
+                    <span style={{ fontSize:22, fontWeight:700, color:c, ...mono }}>{data[key]}</span>
+                  </div>
+                  <div style={{ fontSize:11, color:C.text3, marginBottom:8 }}>{desc}</div>
+                  <input type="range" min={1} max={10} step={1} value={data[key]}
+                    onChange={e=>set(key,parseInt(e.target.value))}
+                    style={{ width:'100%', accentColor:c }}/>
+                  <div style={{ display:'flex', justifyContent:'space-between', fontSize:8, color:C.text3, ...mono, marginTop:2 }}>
+                    <span>1 — LOW</span><span>10 — EXTREME</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {step === 'actors' && (
+            <div style={{ maxWidth:620 }}>
+              <div style={{ fontSize:18, fontWeight:700, marginBottom:4 }}>Map Actors & Assumptions</div>
+              <div style={{ fontSize:12, color:C.text3, marginBottom:24 }}>Who is involved? What are we assuming to be true?</div>
+              <div style={{ marginBottom:20 }}>
+                <span style={labelStyle}>KEY ACTORS</span>
+                {data.actors.map((a, i) => (
+                  <div key={i} style={{ display:'grid', gridTemplateColumns:'1fr 110px 1fr auto', gap:7, marginBottom:8, alignItems:'center' }}>
+                    <input value={a.name} onChange={e=>{const arr=[...data.actors];arr[i]={...arr[i],name:e.target.value};set('actors',arr);}}
+                      placeholder="Name or role" style={inputStyle}/>
+                    <select value={a.role} onChange={e=>{const arr=[...data.actors];arr[i]={...arr[i],role:e.target.value};set('actors',arr);}}
+                      style={{...inputStyle, cursor:'pointer'}}>
+                      <option value="human">Human</option>
+                      <option value="agent">AI Agent</option>
+                      <option value="system">System</option>
+                      <option value="external">External</option>
+                    </select>
+                    <input value={a.stake} onChange={e=>{const arr=[...data.actors];arr[i]={...arr[i],stake:e.target.value};set('actors',arr);}}
+                      placeholder="Stake / interest" style={inputStyle}/>
+                    {i === data.actors.length-1
+                      ? <Btn sm onClick={()=>set('actors',[...data.actors,{name:'',role:'human',stake:''}])}>+</Btn>
+                      : <div style={{width:32}}/>}
+                  </div>
+                ))}
+              </div>
+              <Field label="VERIFIED ASSUMPTIONS">
+                {data.assumptions.map((a,i) => (
+                  <div key={i} style={{ display:'flex', gap:7, marginBottom:7, alignItems:'center' }}>
+                    <span style={{ color:C.green, fontSize:12, flexShrink:0 }}>✓</span>
+                    <input value={a} onChange={e=>{const arr=[...data.assumptions];arr[i]=e.target.value;set('assumptions',arr);}}
+                      placeholder={`Assumption ${i+1}...`} style={{...inputStyle, flex:1}}/>
+                    {i===data.assumptions.length-1 &&
+                      <Btn sm onClick={()=>set('assumptions',[...data.assumptions,''])}>+</Btn>}
+                  </div>
+                ))}
+              </Field>
+            </div>
+          )}
+
+          {step === 'simulate' && (
+            <div style={{ maxWidth:620 }}>
+              <div style={{ fontSize:18, fontWeight:700, marginBottom:4 }}>Simulate Paths</div>
+              <div style={{ fontSize:12, color:C.text3, marginBottom:24 }}>Describe up to three forward scenarios. What happens in each?</div>
+              {[['A',C.orange,'Primary — what we do if we proceed'],
+                ['B',C.cyan, 'Alternative — a safer or different approach'],
+                ['C',C.text3,'Fallback — minimum viable action']].map(([p,c,desc]) => (
+                <div key={p} style={{ marginBottom:20 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:9, marginBottom:6 }}>
+                    <div style={{ width:22, height:22, borderRadius:'50%', background:`${c}25`,
+                      border:`1px solid ${c}60`, display:'flex', alignItems:'center',
+                      justifyContent:'center', fontSize:10, fontWeight:700, color:c, ...mono }}>
+                      {p}
+                    </div>
+                    <span style={{ fontSize:11, color:C.text2 }}>{desc}</span>
+                  </div>
+                  <textarea value={data[`scenario${p}`]}
+                    onChange={e=>set(`scenario${p}`,e.target.value)}
+                    rows={3} placeholder={`Describe path ${p}...`}
+                    style={{...inputStyle, resize:'vertical', lineHeight:1.6}}/>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {step === 'invert' && (
+            <div style={{ maxWidth:620 }}>
+              <div style={{ fontSize:18, fontWeight:700, marginBottom:4 }}>Stress Test — Invert the Decision</div>
+              <div style={{ fontSize:12, color:C.text3, marginBottom:24 }}>Think backwards. What are the failure modes? What would have to be true for this to go badly wrong?</div>
+              <Field label="PRIMARY RISK — What's the worst plausible outcome?">
+                <textarea value={data.invertRisk} onChange={e=>set('invertRisk',e.target.value)}
+                  rows={3} placeholder="e.g. Cache coherence failures under sustained load cause data corruption in finance module..."
+                  style={{...inputStyle, resize:'vertical', lineHeight:1.6, borderColor:C.red+'44'}}/>
+              </Field>
+              <Field label="CASCADE RISK — What breaks downstream if this fails?">
+                <textarea value={data.invertCascade} onChange={e=>set('invertCascade',e.target.value)}
+                  rows={3} placeholder="e.g. Q2 reporting delayed, triggering audit, reputational damage with board..."
+                  style={{...inputStyle, resize:'vertical', lineHeight:1.6, borderColor:C.amber+'44'}}/>
+              </Field>
+              <Field label="COUNTERFACTUAL CONDITIONS — What would change your mind?">
+                {data.counterfactuals.map((c,i) => (
+                  <div key={i} style={{ display:'flex', gap:7, marginBottom:8 }}>
+                    <div style={{ padding:'8px 10px', background:`${C.orange}0f`,
+                      border:`1px solid ${C.orange}30`, borderRadius:4, fontSize:9, color:C.orange,
+                      ...mono, flexShrink:0, lineHeight:'20px' }}>IF</div>
+                    <input value={c} onChange={e=>{const a=[...data.counterfactuals];a[i]=e.target.value;set('counterfactuals',a);}}
+                      placeholder="condition that invalidates this decision..."
+                      style={{...inputStyle, flex:1}}/>
+                    {i===data.counterfactuals.length-1 &&
+                      <Btn sm onClick={()=>set('counterfactuals',[...data.counterfactuals,''])}>+</Btn>}
+                  </div>
+                ))}
+              </Field>
+            </div>
+          )}
+
+          {step === 'judge' && (
+            <div style={{ maxWidth:620 }}>
+              <div style={{ fontSize:18, fontWeight:700, marginBottom:4 }}>Judge — Route the Decision</div>
+              <div style={{ fontSize:12, color:C.text3, marginBottom:24 }}>Apply the DAM framework. Based on gravity and authority, how should this proceed?</div>
+              <div style={{ padding:16, background:C.card2, border:`1px solid ${C.border}`, borderRadius:6, marginBottom:20 }}>
+                <div style={{ fontSize:9, color:C.text3, ...mono, marginBottom:10 }}>GRAVITY SCORE SUMMARY</div>
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginBottom:12 }}>
+                  {[['Impact',data.impact,C.red],['Urgency',data.urgency,C.amber],
+                    ['Uncertainty',data.uncertainty,C.purple],['Irreversibility',data.irreversibility,C.orange]].map(([l,v,c])=>(
+                    <div key={l} style={{ textAlign:'center' }}>
+                      <div style={{ fontSize:9, color:C.text3, marginBottom:3 }}>{l}</div>
+                      <div style={{ fontSize:20, fontWeight:700, color:c, ...mono }}>{v}</div>
+                      <Bar value={v*10} color={c} h={3} style={{ marginTop:4 }}/>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', paddingTop:10, borderTop:`1px solid ${C.border}` }}>
+                  <span style={{ fontSize:11, color:C.text2 }}>Overall Gravity Score</span>
+                  <span style={{ fontSize:28, fontWeight:700, color:gravityColor, ...mono }}>{gravity}</span>
+                </div>
+              </div>
+              <Field label="ROUTING VERDICT">
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
+                  {[['ACT',C.green,'Authority sufficient. Proceed immediately.'],
+                    ['ESCALATE',C.red,'Gravity too high for current authority level.'],
+                    ['DEFER',C.text3,'Low gravity. Batch for next review cycle.']].map(([r,c,desc]) => (
+                    <div key={r} onClick={() => set('routing',r)} style={{
+                      padding:'14px 12px', borderRadius:5, cursor:'pointer', textAlign:'center',
+                      background: data.routing===r ? `${c}18` : 'transparent',
+                      border:`2px solid ${data.routing===r ? c : C.border}`,
+                      transition:'all 0.15s' }}>
+                      <div style={{ fontSize:14, fontWeight:700, color:c, ...mono, marginBottom:5 }}>{r}</div>
+                      <div style={{ fontSize:10, color:C.text3, lineHeight:1.4 }}>{desc}</div>
+                    </div>
+                  ))}
+                </div>
+              </Field>
+              <Field label="ACTIVATION CONDITIONS (when does this decision execute?)">
+                {data.conditions.map((c,i) => (
+                  <div key={i} style={{ display:'flex', gap:7, marginBottom:8 }}>
+                    <input value={c} onChange={e=>{const a=[...data.conditions];a[i]=e.target.value;set('conditions',a);}}
+                      placeholder="e.g. If latency exceeds 340ms P99, halt migration..."
+                      style={{...inputStyle, flex:1}}/>
+                    {i===data.conditions.length-1 &&
+                      <Btn sm onClick={()=>set('conditions',[...data.conditions,''])}>+</Btn>}
+                  </div>
+                ))}
+              </Field>
+            </div>
+          )}
+
+          {step === 'commit' && (
+            <div style={{ maxWidth:620 }}>
+              <div style={{ fontSize:18, fontWeight:700, marginBottom:4 }}>Commit the Decision</div>
+              <div style={{ fontSize:12, color:C.text3, marginBottom:24 }}>Log ownership, deadline, and final notes. This is immutable once submitted.</div>
+              <div style={{ padding:14, background:`${C.orange}0a`, border:`1px solid ${C.orange}30`, borderRadius:6, marginBottom:22 }}>
+                <div style={{ fontSize:9, color:C.orange, ...mono, marginBottom:8 }}>DECISION SUMMARY</div>
+                <div style={{ fontSize:14, fontWeight:700, marginBottom:4 }}>{data.title || '—'}</div>
+                <div style={{ display:'flex', gap:12, flexWrap:'wrap' }}>
+                  <Badge color={gravityColor}>GRAVITY {gravity}</Badge>
+                  <Badge color={data.routing==='ACT'?C.green:data.routing==='ESCALATE'?C.red:C.text3}>{data.routing||'NO VERDICT'}</Badge>
+                  <Badge color={C.cyan}>{data.decisionType?.toUpperCase()}</Badge>
+                  <Badge color={C.text3}>{data.actors.filter(a=>a.name).length} ACTORS</Badge>
+                </div>
+              </div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, marginBottom:16 }}>
+                <Field label="DECISION OWNER">
+                  <input value={data.owner} onChange={e=>set('owner',e.target.value)}
+                    placeholder="Name or team..." style={inputStyle}/>
+                </Field>
+                <Field label="DECISION DEADLINE">
+                  <input type="date" value={data.deadline} onChange={e=>set('deadline',e.target.value)}
+                    style={{...inputStyle}}/>
+                </Field>
+              </div>
+              <Field label="FINAL NOTES / EXEGESIS">
+                <textarea value={data.notes} onChange={e=>set('notes',e.target.value)}
+                  rows={4} placeholder="Any final context, caveats, or observer perspective notes..."
+                  style={{...inputStyle, resize:'vertical', lineHeight:1.6}}/>
+              </Field>
+              <div style={{ display:'flex', gap:10, marginTop:8 }}>
+                <div style={{ flex:1, padding:14, background:`${C.cyan}08`, border:`1px solid ${C.cyan}25`, borderRadius:5 }}>
+                  <div style={{ fontSize:8, color:C.cyan, ...mono, marginBottom:4 }}>REVERSIBILITY INDEX</div>
+                  <div style={{ fontSize:20, fontWeight:700, color:C.cyan }}>{((10-data.irreversibility)/10).toFixed(2)}</div>
+                </div>
+                <div style={{ flex:1, padding:14, background:`${C.green}08`, border:`1px solid ${C.green}25`, borderRadius:5 }}>
+                  <div style={{ fontSize:8, color:C.green, ...mono, marginBottom:4 }}>CONFIDENCE EST.</div>
+                  <div style={{ fontSize:20, fontWeight:700, color:C.green }}>{Math.min(99,Math.round(55+parseFloat(gravity)*4))}%</div>
+                </div>
+                <div style={{ flex:1, padding:14, background:`${C.purple}08`, border:`1px solid ${C.purple}25`, borderRadius:5 }}>
+                  <div style={{ fontSize:8, color:C.purple, ...mono, marginBottom:4 }}>OPTION VALUE</div>
+                  <div style={{ fontSize:20, fontWeight:700, color:C.purple }}>{(parseFloat(gravity)*0.9).toFixed(1)}</div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Right: live preview panel */}
+        <div style={{ width:220, borderLeft:`1px solid ${C.border}`, overflowY:'auto', padding:14, flexShrink:0 }}>
+          <div style={{ marginBottom:14 }}>
+            <div style={{ fontSize:9, color:C.text3, ...mono, marginBottom:8, letterSpacing:'0.1em' }}>LIVE DECISION BRIEF</div>
+            <div style={{ fontSize:13, fontWeight:700, lineHeight:1.4, marginBottom:8, color:data.title?C.text1:C.text3, fontStyle:data.title?'normal':'italic' }}>
+              {data.title || 'Untitled decision...'}
+            </div>
+            {data.decisionType && <Badge color={C.orange} style={{marginBottom:8}}>{data.decisionType.toUpperCase()}</Badge>}
+          </div>
+
+          <Card style={{ marginBottom:12 }}>
+            <SLabel>Gravity Score</SLabel>
+            <div style={{ fontSize:36, fontWeight:700, color:gravityColor, ...mono, lineHeight:1, marginBottom:6 }}>{gravity}</div>
+            <Bar value={parseFloat(gravity)*10} color={gravityColor} h={5} style={{ marginBottom:8 }}/>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:5 }}>
+              {[['I',data.impact,C.red],['U',data.urgency,C.amber],['Uc',data.uncertainty,C.purple],['Ir',data.irreversibility,C.orange]].map(([l,v,c])=>(
+                <div key={l} style={{ background:C.card2, borderRadius:3, padding:'5px 7px', textAlign:'center' }}>
+                  <div style={{ fontSize:7, color:C.text3, ...mono }}>{l==='I'?'IMPACT':l==='U'?'URGENCY':l==='Uc'?'UNCERT.':'IRREVERS.'}</div>
+                  <div style={{ fontSize:14, fontWeight:700, color:c }}>{v}</div>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          {data.routing && (
+            <div style={{ padding:12, background:`${data.routing==='ACT'?C.green:data.routing==='ESCALATE'?C.red:C.text3}14`,
+              border:`1px solid ${data.routing==='ACT'?C.green:data.routing==='ESCALATE'?C.red:C.text3}44`,
+              borderRadius:5, marginBottom:12 }}>
+              <div style={{ fontSize:8, color:C.text3, ...mono, marginBottom:3 }}>VERDICT</div>
+              <div style={{ fontSize:18, fontWeight:700, color:data.routing==='ACT'?C.green:data.routing==='ESCALATE'?C.red:C.text2 }}>
+                {data.routing==='ACT'?'▶ ACT NOW':data.routing==='ESCALATE'?'↑ ESCALATE':'⏸ DEFER'}
+              </div>
+            </div>
+          )}
+
+          <Card style={{ marginBottom:12 }}>
+            <SLabel>Checklist</SLabel>
+            {[['Title defined', !!data.title],
+              ['Context written', !!data.context],
+              ['Gravity scored', data.impact!==5||data.urgency!==5],
+              ['Actors mapped', data.actors.some(a=>a.name)],
+              ['Paths simulated', !!data.scenarioA],
+              ['Stress tested', !!data.invertRisk],
+              ['Verdict set', !!data.routing],
+              ['Owner assigned', !!data.owner]].map(([l,ok])=>(
+              <div key={l} style={{ display:'flex', alignItems:'center', gap:7, marginBottom:6 }}>
+                <span style={{ color:ok?C.green:C.text3, fontSize:11, flexShrink:0 }}>{ok?'✓':'○'}</span>
+                <span style={{ fontSize:11, color:ok?C.text2:C.text3 }}>{l}</span>
+              </div>
+            ))}
+          </Card>
+
+          <div style={{ fontSize:8, color:C.text3, ...mono, marginBottom:5 }}>CURRENT STEP</div>
+          <div style={{ fontSize:12, fontWeight:600, color:C.orange }}>
+            {WIZARD_STEPS[stepIdx]?.num} — {WIZARD_STEPS[stepIdx]?.label}
+          </div>
+        </div>
+      </div>
+
+      {/* Nav footer */}
+      <div style={{ padding:'12px 20px', borderTop:`1px solid ${C.border}`, display:'flex',
+        justifyContent:'space-between', alignItems:'center', background:C.card2, flexShrink:0 }}>
+        <Btn onClick={back} style={{ opacity:stepIdx===0?0.3:1 }}>← BACK</Btn>
+        <div style={{ display:'flex', gap:6 }}>
+          {WIZARD_STEPS.map((s,i) => (
+            <div key={s.id} style={{ width:6, height:6, borderRadius:'50%',
+              background: i===stepIdx ? C.orange : i < stepIdx ? C.green : C.border2,
+              transition:'background 0.2s' }}/>
+          ))}
+        </div>
+        {stepIdx < WIZARD_STEPS.length - 1
+          ? <Btn primary onClick={next}>CONTINUE →</Btn>
+          : <Btn primary onClick={() => setSubmitted(true)}>✦ COMMIT DECISION</Btn>
+        }
+      </div>
+    </div>
+  );
+};
+
+// ── COMMAND CENTER — OMC / EMC / GK ───────────────────────────────────────
+const OMC_AGENTS=[
+  {name:'Planner',       icon:'✦',color:C.orange,load:76,status:'Scenario split',  badge:'nominal'},
+  {name:'Inversion',     icon:'⊗',color:C.red,   load:91,status:'Failure modes',   badge:'nominal'},
+  {name:'Counterfactual',icon:'⬡',color:C.cyan,  load:83,status:'What-if branch',  badge:'nominal'},
+  {name:'Exegesis',      icon:'◎',color:C.purple,load:97,status:'Context recall',  badge:'degraded'},
+  {name:'Judge',         icon:'⊕',color:C.green, load:80,status:'Multi-objective', badge:'nominal'},
+  {name:'Meta',          icon:'◈',color:C.amber, load:87,status:'Calibration',     badge:'nominal'},
+];
+const OMC_ACTIVITY=[
+  {type:'warn',label:'META REVIEW',       msg:'Calibration drift: Judge overweighting short-term gain.',    time:'02:14:11'},
+  {type:'warn',label:'META REVIEW',       msg:'Calibration drift detected — bias threshold at 0.041.',      time:'02:13:11'},
+  {type:'ok',  label:'CONSTRAINT CLEARED',msg:'Reversibility floor satisfied — Path A is now viable.',     time:'02:10:44'},
+  {type:'warn',label:'RISK ALERT',        msg:'Inversion flagged systemic lock-in risk in Path C.',         time:'01:58:22'},
+  {type:'warn',label:'RISK ALERT',        msg:'Exegesis degraded — context recall latency elevated.',       time:'01:44:09'},
+];
+const OMC_TASKS=[
+  {label:'Define decision scope',   done:true},
+  {label:'Map constraint space',    done:true},
+  {label:'Run scenario simulation', done:false,active:true},
+  {label:'Generate decision brief', done:false},
+  {label:'Submit for review',       done:false},
+];
+const OMC_WWCM=[
+  {label:'Context is stable',    ok:true},
+  {label:'Constraints satisfied',ok:true},
+  {label:'Reversibility ≥ 0.4', ok:true},
+];
+const OMC_LOGS=[
+  {id:'DEC-041',title:'Cloud Infra Migration',risk:'HIGH',sc:C.amber,st:'PENDING AAR',rev:'0.38'},
+  {id:'DEC-041',title:'Vendor Contract Ext.', risk:'MED', sc:C.green,st:'EXECUTED',   rev:'0.62'},
+  {id:'DEC-039',title:'Workforce Realloc.',   risk:'HIGH',sc:C.red,  st:'ESCALATED',  rev:'0.29'},
+];
+
+const OperatorControl=()=>{
+  const [scenario,setScenario]=useState('A');
+  return(
+    <div style={{display:'flex',height:'100%',overflow:'hidden'}}>
+      {/* Left */}
+      <div style={{width:186,borderRight:`1px solid ${C.border}`,display:'flex',flexDirection:'column',flexShrink:0}}>
+        <div style={{padding:'10px 12px',borderBottom:`1px solid ${C.border}`,background:C.card2}}>
+          <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:8}}>
+            <Dot color={C.orange} pulse/><span style={{fontSize:8,color:C.orange,fontWeight:700,...mono,letterSpacing:'0.1em'}}>OPERATOR LAYER</span>
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
+            {[['CONFIDENCE','0.869'],['COVERAGE','76%'],['TOKENS/S','130.3'],['LATENCY','38ms']].map(([l,v])=>(
+              <div key={l}><div style={{fontSize:7,color:C.text3,...mono}}>{l}</div><div style={{fontSize:11,fontWeight:700,...mono}}>{v}</div></div>
+            ))}
+          </div>
+        </div>
+        <div style={{padding:'10px 12px',borderBottom:`1px solid ${C.border}`,overflowY:'auto',maxHeight:255}}>
+          <SLabel right={<span style={{fontSize:8,color:C.text3,...mono}}>6 ACTIVE</span>}>Agent Console</SLabel>
+          {OMC_AGENTS.map(a=>(
+            <div key={a.name} style={{marginBottom:9}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:2}}>
+                <div style={{display:'flex',alignItems:'center',gap:5}}>
+                  <span style={{color:a.color,fontSize:11,width:14}}>{a.icon}</span>
+                  <span style={{fontSize:11,fontWeight:500}}>{a.name}</span>
+                </div>
+                <Badge color={a.badge==='degraded'?C.red:C.text3}>{a.badge}</Badge>
+              </div>
+              <div style={{display:'flex',gap:5,alignItems:'center',marginBottom:1}}>
+                <Bar value={a.load} color={a.color} h={3} style={{flex:1}}/>
+                <span style={{fontSize:8,...mono,color:a.color,width:22,textAlign:'right'}}>{a.load}%</span>
+              </div>
+              <div style={{fontSize:9,color:C.text3}}>{a.status}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{flex:1,overflowY:'auto',padding:'10px 12px'}}>
+          <SLabel>Activity Feed</SLabel>
+          {OMC_ACTIVITY.map((a,i)=>(
+            <div key={i} style={{marginBottom:10,paddingBottom:10,borderBottom:`1px solid ${C.border}`}}>
+              <div style={{fontSize:8,color:a.type==='warn'?C.amber:C.green,fontWeight:700,...mono,marginBottom:2}}>{a.type==='warn'?'⚠':'✓'} {a.label}</div>
+              <div style={{fontSize:10,color:C.text2,lineHeight:1.45,marginBottom:2}}>{a.msg}</div>
+              <div style={{fontSize:8,color:C.text3,...mono}}>{a.time}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Center canvas */}
+      <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+        <div style={{padding:'9px 16px',borderBottom:`1px solid ${C.border}`,display:'flex',alignItems:'center',gap:10,background:C.card2,flexShrink:0,flexWrap:'wrap'}}>
+          <span style={{fontSize:9,color:C.text3,...mono,flexShrink:0}}>SCENARIOS:</span>
+          {[['Execute Path A','91%',C.orange,'A'],['Hold — Gather Intel','77%',C.cyan,'B'],['Escalate to EMC','65%',C.text3,'C']].map(([l,p,c,s])=>(
+            <div key={s} onClick={()=>setScenario(s)} style={{display:'flex',alignItems:'center',gap:6,padding:'4px 10px',borderRadius:4,cursor:'pointer',
+              background:scenario===s?`${c}18`:'transparent',border:`1px solid ${scenario===s?c:C.border}`,transition:'all 0.12s'}}>
+              <Dot color={c}/>
+              <span style={{fontSize:11,color:scenario===s?c:C.text2,fontWeight:scenario===s?600:400}}>{l}</span>
+              <span style={{fontSize:9,color:c,fontWeight:700,...mono}}>{p}</span>
+            </div>
+          ))}
+        </div>
+        <div style={{flex:1,position:'relative',background:C.bg,overflow:'hidden'}}>
+          <svg width="100%" height="100%" viewBox="0 0 600 360" preserveAspectRatio="xMidYMid meet">
+            {Array.from({length:12},(_,r)=>Array.from({length:19},(_,col)=>(
+              <circle key={`${r}-${col}`} cx={col*32+20} cy={r*30+18} r={1} fill={C.border} opacity={0.5}/>
+            )))}
+            <text x="30" y="194" fill={C.text3} fontSize="8" fontFamily="Space Mono">DECISION ENTRY</text>
+            <line x1="55" y1="200" x2="230" y2="200" stroke={C.border2} strokeWidth="1" strokeDasharray="4 4"/>
+            <circle cx="245" cy="200" r="11" fill={C.orange} opacity={0.95}/>
+            <circle cx="245" cy="200" r="19" fill="none" stroke={C.orange} strokeWidth="1" opacity={0.3}/>
+            <circle cx="245" cy="200" r="30" fill="none" stroke={C.orange} strokeWidth="0.5" opacity={0.12}/>
+            <text x="222" y="228" fill={C.orange} fontSize="8" fontFamily="Space Mono">DECISION NODE</text>
+            {/* Path A */}
+            <line x1="258" y1="192" x2="490" y2="138" stroke={scenario==='A'?C.orange:C.border2} strokeWidth={scenario==='A'?2:1} strokeDasharray={scenario==='A'?undefined:"5 4"}/>
+            <circle cx="502" cy="135" r="9" fill={scenario==='A'?C.orange:`${C.orange}20`}/>
+            <circle cx="502" cy="135" r="16" fill="none" stroke={scenario==='A'?`${C.orange}45`:'transparent'} strokeWidth="1"/>
+            <text x="480" y="123" fill={C.orange} fontSize="8" fontFamily="Space Mono">PROJECTED</text>
+            <text x="480" y="114" fill={C.text3} fontSize="7" fontFamily="Space Mono">PATH A · 91%</text>
+            {/* Path B */}
+            <line x1="258" y1="205" x2="490" y2="228" stroke={scenario==='B'?C.cyan:C.border2} strokeWidth={scenario==='B'?2:1} strokeDasharray="5 4"/>
+            <circle cx="502" cy="230" r="9" fill={scenario==='B'?C.cyan:`${C.cyan}20`}/>
+            <text x="480" y="252" fill={C.cyan} fontSize="7" fontFamily="Space Mono">PATH B · 77%</text>
+            {/* Path C */}
+            <line x1="255" y1="210" x2="490" y2="295" stroke={scenario==='C'?C.text2:C.border} strokeWidth={scenario==='C'?2:1} strokeDasharray="3 6"/>
+            <circle cx="502" cy="298" r="9" fill={scenario==='C'?C.text2:`${C.text3}20`}/>
+            <text x="480" y="318" fill={C.text3} fontSize="7" fontFamily="Space Mono">PATH C · 65%</text>
+          </svg>
+          <div style={{position:'absolute',bottom:0,left:0,right:0,padding:'8px 16px',background:`${C.card}ee`,borderTop:`1px solid ${C.border}`,display:'flex',gap:10,alignItems:'center'}}>
+            <span style={{fontSize:9,color:C.text3,...mono,flexShrink:0}}>▶ TEMPORAL CONTEXT</span>
+            <span style={{fontSize:10,color:C.orange,...mono}}>T – 04:12:05:22</span>
+            <div style={{flex:1}}><Bar value={62} color={C.orange} h={3}/></div>
+            {['H-PAST','REALTIME','PROJECTION'].map((t,i)=>(
+              <div key={t} style={{padding:'3px 7px',borderRadius:3,fontSize:8,...mono,
+                background:i===1?C.orange:'transparent',border:`1px solid ${i===1?C.orange:C.border}`,
+                color:i===1?'#fff':C.text3,flexShrink:0}}>{t}</div>
+            ))}
+          </div>
+        </div>
+        <div style={{padding:'10px 16px',borderTop:`1px solid ${C.border}`,display:'flex',gap:7,background:C.card2,flexShrink:0}}>
+          <Btn sm>⬡ RUN SIMULATION</Btn><Btn sm>⊕ APPLY CONSTRAINTS</Btn><Btn sm>◎ BRIEF</Btn>
+          <div style={{flex:1}}/><Btn primary>▶ EXECUTE DECISION</Btn>
+        </div>
+      </div>
+
+      {/* Right */}
+      <div style={{width:198,borderLeft:`1px solid ${C.border}`,overflowY:'auto',padding:12,flexShrink:0}}>
+        <div style={{display:'flex',gap:6,marginBottom:12}}>
+          <Btn sm style={{flex:1}}>FULL THEATER</Btn><Btn sm style={{flex:1}}>OVERLOAD</Btn>
+        </div>
+        <Card style={{marginBottom:11}}>
+          <SLabel>Task Decomposition</SLabel>
+          {OMC_TASKS.map((s,i)=>(
+            <div key={i} style={{display:'flex',gap:8,marginBottom:7,alignItems:'flex-start'}}>
+              <div style={{width:14,height:14,borderRadius:'50%',flexShrink:0,marginTop:1,
+                background:s.done?C.green:s.active?C.orange:C.border2,
+                display:'flex',alignItems:'center',justifyContent:'center',fontSize:8,color:'#fff'}}>
+                {s.done?'✓':s.active?'⟳':''}
+              </div>
+              <div style={{fontSize:11,color:s.done?C.text2:s.active?C.text1:C.text3,lineHeight:1.35}}>{s.label}</div>
+            </div>
+          ))}
+          <div style={{marginTop:8}}>
+            <div style={{display:'flex',justifyContent:'space-between',marginBottom:3}}>
+              <span style={{fontSize:8,color:C.text3,...mono}}>PROGRESS</span>
+              <span style={{fontSize:8,color:C.orange,...mono}}>2/5</span>
+            </div>
+            <Bar value={40} color={C.orange} h={3}/>
+          </div>
+        </Card>
+        <Card style={{marginBottom:11}}>
+          <SLabel>WWCM Conditions</SLabel>
+          {OMC_WWCM.map(w=>(
+            <div key={w.label} style={{display:'flex',alignItems:'center',gap:7,marginBottom:7}}>
+              <span style={{color:w.ok?C.green:C.red,fontSize:11,flexShrink:0}}>{w.ok?'✓':'✕'}</span>
+              <span style={{fontSize:11,color:w.ok?C.text2:C.red}}>{w.label}</span>
+            </div>
+          ))}
+          <Btn sm primary full style={{marginTop:8}}>CLEAR TO DECIDE</Btn>
+        </Card>
+        <Card>
+          <SLabel right={<span style={{fontSize:8,color:C.orange,...mono,cursor:'pointer'}}>FULL LOG →</span>}>Decision Logs</SLabel>
+          {OMC_LOGS.map((d,i)=>(
+            <div key={i} style={{marginBottom:9,paddingBottom:9,borderBottom:i<OMC_LOGS.length-1?`1px solid ${C.border}`:undefined}}>
+              <div style={{display:'flex',justifyContent:'space-between',marginBottom:2}}>
+                <span style={{fontSize:8,color:C.text3,...mono}}>{d.id}</span><Badge color={d.sc}>{d.st}</Badge>
+              </div>
+              <div style={{fontSize:11,fontWeight:600,marginBottom:2}}>{d.title}</div>
+              <div style={{fontSize:8,color:C.text3,...mono}}>Risk:{d.risk} · Rev:{d.rev}</div>
+            </div>
+          ))}
+        </Card>
+      </div>
+    </div>
+  );
+};
+
+// ·· EMC ··
+const EMC_PORTFOLIO=[
+  {id:'DEC-441',title:'Cloud Infrastructure Migration',layer:'OMC',status:'ACTIVE',    sc:C.red,  risk:'HIGH',rev:0.38,impact:7.1},
+  {id:'DEC-540',title:'Vendor Contract Extension',     layer:'OMC',status:'EXECUTED',  sc:C.green,risk:'MED', rev:0.62,impact:4.7},
+  {id:'DEC-512',title:'Workforce Reallocation Q2',     layer:'OMC',status:'ESCALATED', sc:C.red,  risk:'HIGH',rev:0.29,impact:6.1},
+  {id:'DEC-622',title:'Market Entry — Sector 7',       layer:'EMC',status:'PENDING',   sc:C.amber,risk:'HIGH',rev:0.51,impact:7.1},
+  {id:'DEC-417',title:'Technology Stack Sunset',       layer:'GK', status:'ACTIVE',    sc:C.cyan, risk:'MED', rev:0.67,impact:7.4},
+];
+const EMC_FAITH=[
+  {l:'High Confidence',    v:12,c:C.green},
+  {l:'Fragile',            v:8, c:C.amber},
+  {l:'Ethically Sensitive',v:6, c:C.purple},
+  {l:'Escalated',          v:2, c:C.red},
+];
+const EMC_DRIFT=[
+  {type:'DRIFT',     color:C.orange,msg:'DEC-041 context shifted materially — re-evaluation recommended'},
+  {type:'VIOLATION', color:C.red,   msg:'DEC-038 approaching reversibility floor (current: 0.29 / floor: 0.30)'},
+  {type:'CONFIDENCE',color:C.cyan,  msg:'Path A confidence degraded 4.2% since last review'},
+  {type:'EXPIRY',    color:C.text3, msg:'DEC-038 decision window closes in 18h 42m'},
+];
+
+const ExecutiveControl=()=>{
+  const [rf,setRf]=useState(0.40);
+  const [rt,setRt]=useState(0.65);
+  const [ew,setEw]=useState(0.68);
+  const [tc,setTc]=useState(72);
+  return(
+    <div style={{display:'flex',height:'100%',overflow:'hidden'}}>
+      <div style={{flex:1,overflowY:'auto',padding:'14px 20px'}}>
+        <div style={{display:'flex',alignItems:'center',gap:14,marginBottom:14,flexWrap:'wrap'}}>
+          <div style={{display:'flex',alignItems:'center',gap:6}}><Dot color={C.cyan} pulse/>
+            <span style={{fontSize:8,color:C.cyan,fontWeight:700,...mono,letterSpacing:'0.1em'}}>EXECUTIVE LAYER</span></div>
+          {[['SOLUTION VER','v3.7.1'],['TRUST SCORE','0.908'],['AVG CONFIDENCE','85.3%'],['ACTIVE DECISIONS','25']].map(([l,v])=>(
+            <div key={l} style={{borderLeft:`1px solid ${C.border}`,paddingLeft:12}}>
+              <div style={{fontSize:7,color:C.text3,...mono}}>{l}</div>
+              <div style={{fontSize:12,fontWeight:700,...mono}}>{v}</div>
+            </div>
+          ))}
+        </div>
+        <Card style={{marginBottom:14}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+            <div><div style={{fontSize:14,fontWeight:700,marginBottom:2}}>Decision Portfolio</div>
+              <div style={{fontSize:11,color:C.text3}}>All active decisions across authority layers</div></div>
+            <Btn sm primary>+ NEW DECISION</Btn>
+          </div>
+          <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+            <thead><tr style={{borderBottom:`1px solid ${C.border}`}}>
+              {['DECISION','LAYER','STATUS','RISK','REV.','IMPACT'].map(h=>(
+                <th key={h} style={{padding:'5px 8px',textAlign:'left',fontSize:8,color:C.text3,...mono,fontWeight:700,letterSpacing:'0.07em'}}>{h}</th>
+              ))}</tr></thead>
+            <tbody>{EMC_PORTFOLIO.map((d,i)=>(
+              <tr key={i} style={{borderBottom:`1px solid ${C.border}`}}>
+                <td style={{padding:'9px 8px'}}><div style={{fontWeight:600,fontSize:12}}>{d.title}</div>
+                  <div style={{fontSize:8,color:C.text3,...mono}}>{d.id}</div></td>
+                <td style={{padding:'9px 8px'}}><Badge color={d.layer==='OMC'?C.cyan:d.layer==='EMC'?C.orange:C.purple}>{d.layer}</Badge></td>
+                <td style={{padding:'9px 8px'}}><Badge color={d.sc}>{d.status}</Badge></td>
+                <td style={{padding:'9px 8px',color:d.risk==='HIGH'?C.red:C.amber,fontWeight:700,...mono,fontSize:11}}>{d.risk}</td>
+                <td style={{padding:'9px 8px',width:110}}>
+                  <div style={{display:'flex',alignItems:'center',gap:5}}>
+                    <Bar value={d.rev*100} color={d.rev<0.35?C.red:d.rev<0.55?C.amber:C.green} h={3} style={{flex:1}}/>
+                    <span style={{fontSize:8,...mono,color:C.text2,flexShrink:0}}>{d.rev}</span>
+                  </div></td>
+                <td style={{padding:'9px 8px',fontWeight:700,...mono,fontSize:11}}>{d.impact}</td>
+              </tr>
+            ))}</tbody>
+          </table>
+        </Card>
+        <Card>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
+            <div><div style={{fontSize:13,fontWeight:700,marginBottom:2}}>Guardrails & Constraints</div>
+              <div style={{fontSize:11,color:C.text3}}>Set system-wide decision policy</div></div>
+            <Btn sm primary>PUBLISH V3.8</Btn>
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
+            {[['REVERSIBILITY FLOOR',rf,setRf,0,1,0.01,C.cyan,v=>v.toFixed(2)],
+              ['RISK TOLERANCE',rt,setRt,0,1,0.01,C.amber,v=>v.toFixed(2)],
+              ['ETHICAL WEIGHT',ew,setEw,0,1,0.01,C.green,v=>v.toFixed(2)],
+              ['TIME CAP (HRS)',tc,setTc,24,168,1,C.orange,v=>`${v}h`]].map(([l,v,s,mn,mx,st,c,fmt])=>(
+              <div key={l}>
+                <div style={{display:'flex',justifyContent:'space-between',marginBottom:5}}>
+                  <span style={{fontSize:8,color:C.text3,...mono}}>{l}</span>
+                  <span style={{fontSize:10,color:c,fontWeight:700,...mono}}>{fmt(v)}</span>
+                </div>
+                <input type="range" min={mn} max={mx} step={st} value={v}
+                  onChange={e=>s(parseFloat(e.target.value))} style={{width:'100%',accentColor:c}}/>
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+      <div style={{width:208,borderLeft:`1px solid ${C.border}`,overflowY:'auto',padding:12,flexShrink:0}}>
+        <div style={{display:'flex',gap:6,marginBottom:12}}>
+          <Btn sm style={{flex:1}}>WORKBENCH</Btn><Btn sm style={{flex:1}}>REV. DEBT</Btn>
+        </div>
+        <Card style={{marginBottom:11}}>
+          <SLabel>FAITH Dashboard</SLabel>
+          <div style={{fontSize:9,color:C.text3,marginBottom:9}}>Decision confidence & sensitivity tiers</div>
+          {EMC_FAITH.map(f=>(
+            <div key={f.l} style={{marginBottom:9}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:3}}>
+                <div style={{display:'flex',alignItems:'center',gap:6}}><Dot color={f.c}/>
+                  <span style={{fontSize:11,color:C.text2}}>{f.l}</span></div>
+                <span style={{fontSize:13,fontWeight:700,color:f.c,...mono}}>{f.v}</span>
+              </div>
+              <Bar value={f.v/14*100} color={f.c} h={3}/>
+            </div>
+          ))}
+        </Card>
+        <Card style={{marginBottom:11}}>
+          <SLabel right={<Badge color={C.red}>4 ACTIVE</Badge>}>Drift & Alerts</SLabel>
+          {EMC_DRIFT.map((a,i)=>(
+            <div key={i} style={{padding:'8px 0',borderBottom:i<EMC_DRIFT.length-1?`1px solid ${C.border}`:undefined}}>
+              <div style={{display:'flex',justifyContent:'space-between',marginBottom:2}}>
+                <span style={{fontSize:8,color:a.color,fontWeight:700,...mono}}>{a.type}</span>
+                <span style={{fontSize:10,color:C.text3,cursor:'pointer'}}>×</span>
+              </div>
+              <div style={{fontSize:10,color:C.text2,lineHeight:1.45}}>{a.msg}</div>
+            </div>
+          ))}
+        </Card>
+        <Card>
+          <SLabel right={<span style={{fontSize:8,color:C.orange,...mono,cursor:'pointer'}}>ALL BRIEFS →</span>}>Decision Briefs</SLabel>
+          <div style={{padding:'10px 12px',background:C.card2,borderRadius:5,border:`1px solid ${C.border}`}}>
+            <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
+              <span style={{fontSize:8,color:C.text3,...mono}}>Q2 Infrastructure Brief</span><Badge color={C.green}>READY</Badge>
+            </div>
+            <div style={{fontSize:11,color:C.text2,lineHeight:1.5,marginBottom:8}}>Cloud migration on critical path. Recommend constraint tightening before execution.</div>
+            <div style={{display:'flex',gap:6}}>
+              <Btn sm style={{flex:1}}>REVIEW</Btn><Btn sm primary style={{flex:1}}>DRILL DOWN</Btn>
+            </div>
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+};
+
+// ·· GK ··
+const GK_AGENTS=[
+  {name:'Planner',       status:'normal',  load:0.38,trend:'nominal'},
+  {name:'Inversion',     status:'normal',  load:0.71,trend:'nominal'},
+  {name:'Counterfactual',status:'normal',  load:0.90,trend:'nominal'},
+  {name:'Exegesis',      status:'degraded',load:0.74,trend:'biased'},
+  {name:'Judge',         status:'normal',  load:0.42,trend:'nominal'},
+];
+const GK_DEBT=[
+  {id:'DEB-011',sev:'HIGH',title:'Cloud Migration Lock-In',    rev:0.38,coupling:0.72},
+  {id:'DEB-012',sev:'MED', title:'Vendor Exclusivity Clause',  rev:0.51,coupling:0.48},
+  {id:'DEB-013',sev:'HIGH',title:'Legacy Pipeline Dependency', rev:0.29,coupling:0.81},
+  {id:'DEB-014',sev:'MED', title:'Tech Stack Commitment',      rev:0.61,coupling:0.33},
+];
+const GK_QUALITY=[
+  {l:'Robustness Gain',   v:'0.741',d:'+0.031',c:C.green, icon:'◈'},
+  {l:'Scenario Coverage', v:'0.683',d:'+0.411',c:C.cyan,  icon:'⬡'},
+  {l:'Outcome Variance',  v:'0.213',d:'-0.009',c:C.orange,icon:'◎'},
+  {l:'Regret Score',      v:'0.987',d:'+0.014',c:C.purple,icon:'⬟'},
+];
+
+const GovernanceKernel=()=>{
+  const [rfSim,setRfSim]=useState(0.40);
+  const [rtSim,setRtSim]=useState(0.65);
+  const [ewSim,setEwSim]=useState(0.80);
+  const calPred=[42,48,46,56,52,60,57,66,70,73,69,76,80];
+  const calAct= [42,51,50,59,56,63,62,70,74,78,75,82,87];
+  const decAff=Math.round(3+rfSim*4+(1-rtSim)*2);
+  const pathBlocked=Math.round(1+rfSim*2);
+  const projQual=Math.min(0.98,0.78+rfSim*0.1-rtSim*0.04+ewSim*0.05).toFixed(3);
+  return(
+    <div style={{display:'flex',height:'100%',overflow:'hidden'}}>
+      {/* Left */}
+      <div style={{width:194,borderRight:`1px solid ${C.border}`,overflowY:'auto',padding:12,flexShrink:0}}>
+        <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:10}}>
+          <Dot color={C.purple} pulse/>
+          <span style={{fontSize:8,color:C.purple,fontWeight:700,...mono,letterSpacing:'0.1em'}}>GOVERNANCE KERNEL</span>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:6,marginBottom:12,padding:'8px 10px',background:C.card2,borderRadius:5,border:`1px solid ${C.border}`}}>
+          {[['8/12',C.purple,'ACTIVE'],['0.822',C.cyan,'CONF.'],['95.8%',C.green,'COMPLY']].map(([v,c,l])=>(
+            <div key={l} style={{textAlign:'center'}}>
+              <div style={{fontSize:11,fontWeight:700,color:c,...mono}}>{v}</div>
+              <div style={{fontSize:7,color:C.text3,...mono}}>{l}</div>
+            </div>
+          ))}
+        </div>
+        <Card style={{marginBottom:11}}>
+          <SLabel>Calibration Dashboard</SLabel>
+          <div style={{fontSize:9,color:C.text3,marginBottom:6}}>Prediction vs realized outcomes</div>
+          <div style={{height:65,overflow:'hidden'}}>
+            <svg width="100%" height="65" viewBox="0 0 170 65" preserveAspectRatio="none">
+              <polyline points={calPred.map((v,i)=>`${i*13+2},${65-v*0.66}`).join(' ')} fill="none" stroke={C.text3} strokeWidth="1.5" strokeDasharray="3 2"/>
+              <polyline points={calAct.map((v,i)=>`${i*13+2},${65-v*0.66}`).join(' ')} fill="none" stroke={C.purple} strokeWidth="1.5"/>
+            </svg>
+          </div>
+          <div style={{display:'flex',gap:10,fontSize:8,...mono,marginTop:4}}>
+            {[['─ ─',C.text3,'Predicted'],['—',C.purple,'Actual']].map(([s,c,l])=>(
+              <div key={l} style={{display:'flex',alignItems:'center',gap:4,color:C.text3}}><span style={{color:c}}>{s}</span>{l}</div>
+            ))}
+          </div>
+        </Card>
+        <Card style={{marginBottom:11}}>
+          <SLabel>Bias Detection</SLabel>
+          {[['Recency Bias',41,C.orange],['Anchoring Bias',28,C.green],['Overconfidence',37,C.amber],['Framing Effect',19,C.cyan]].map(([l,v,c])=>(
+            <div key={l} style={{marginBottom:9}}>
+              <div style={{display:'flex',justifyContent:'space-between',marginBottom:2}}>
+                <span style={{fontSize:10,color:C.text2}}>{l}</span>
+                <span style={{fontSize:9,fontWeight:700,color:c,...mono}}>0.0{v<10?'0'+v:v}</span>
+              </div>
+              <div style={{position:'relative'}}>
+                <Bar value={v} color={c} h={3}/>
+                <div style={{position:'absolute',top:0,left:'50%',width:1,height:3,background:C.text3}}/>
+              </div>
+              <div style={{fontSize:7,color:C.text3,...mono}}>Threshold: 0.050</div>
+            </div>
+          ))}
+        </Card>
+        <Card>
+          <SLabel>Agent Performance</SLabel>
+          {GK_AGENTS.map(a=>(
+            <div key={a.name} style={{marginBottom:9}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:2}}>
+                <span style={{fontSize:11,fontWeight:500}}>{a.name}</span>
+                <Badge color={a.status==='degraded'?C.red:C.text3}>{a.trend}</Badge>
+              </div>
+              <div style={{display:'flex',gap:5,alignItems:'center',marginBottom:1}}>
+                <Bar value={a.load*100} color={a.status==='degraded'?C.red:C.green} h={3} style={{flex:1}}/>
+                <span style={{fontSize:8,...mono,color:C.text2,width:26}}>{a.load}</span>
+              </div>
+              <div style={{fontSize:7,color:C.text3,...mono}}>{a.status}</div>
+            </div>
+          ))}
+        </Card>
+      </div>
+
+      {/* Center */}
+      <div style={{flex:1,overflowY:'auto',padding:'14px 18px'}}>
+        <div style={{display:'flex',gap:7,marginBottom:14}}>
+          <Btn sm primary>FULL DEBT VIEW</Btn><Btn sm>REVIEWS</Btn>
+        </div>
+        <Card style={{marginBottom:16}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
+            <div><div style={{fontSize:14,fontWeight:700,marginBottom:2}}>Reversibility Debt Tracker</div>
+              <div style={{fontSize:11,color:C.text3}}>Commitments reducing future decision optionality</div></div>
+            <div style={{display:'flex',gap:20}}>
+              {[['4',C.orange,'ACTIVE DEBTS'],['2',C.red,'HIGH SEVERITY']].map(([v,c,l])=>(
+                <div key={l} style={{textAlign:'center'}}>
+                  <div style={{fontSize:22,fontWeight:700,color:c,...mono}}>{v}</div>
+                  <div style={{fontSize:7,color:C.text3,...mono}}>{l}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          {GK_DEBT.map((d,i)=>(
+            <div key={i} style={{padding:'11px 0',borderBottom:`1px solid ${C.border}`}}>
+              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:5}}>
+                <span style={{fontSize:8,color:C.text3,...mono}}>{d.id}</span>
+                <Badge color={d.sev==='HIGH'?C.red:C.amber}>{d.sev}</Badge>
+              </div>
+              <div style={{fontSize:13,fontWeight:600,marginBottom:8}}>{d.title}</div>
+              {[['REVERSIBILITY',d.rev,d.rev<0.35?C.red:d.rev<0.55?C.amber:C.green],
+                ['SYSTEM COUPLING',d.coupling,d.coupling>0.7?C.red:d.coupling>0.45?C.amber:C.green]].map(([label,val,color])=>(
+                <div key={label} style={{display:'grid',gridTemplateColumns:'110px 1fr',gap:8,alignItems:'center',marginBottom:4}}>
+                  <div style={{fontSize:8,color:C.text3,...mono}}>{label}</div>
+                  <div style={{display:'flex',gap:7,alignItems:'center'}}>
+                    <Bar value={val*100} color={color} h={4} style={{flex:1}}/>
+                    <span style={{fontSize:9,fontWeight:700,...mono,color:C.text2,width:26}}>{val}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))}
+        </Card>
+        <div style={{fontSize:13,fontWeight:700,marginBottom:12}}>Decision Quality Metrics</div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+          {GK_QUALITY.map(q=>(
+            <Card key={q.l} style={{padding:'12px 14px'}}>
+              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
+                <span style={{color:q.c,fontSize:14}}>{q.icon}</span>
+                <span style={{fontSize:10,color:C.text3}}>{q.l}</span>
+              </div>
+              <div style={{display:'flex',alignItems:'baseline',gap:8}}>
+                <span style={{fontSize:22,fontWeight:700,...mono}}>{q.v}</span>
+                <span style={{fontSize:10,color:parseFloat(q.d)>0?C.green:C.red,...mono}}>{q.d}</span>
+              </div>
+            </Card>
+          ))}
+        </div>
+      </div>
+
+      {/* Right: Policy Lab */}
+      <div style={{width:208,borderLeft:`1px solid ${C.border}`,overflowY:'auto',padding:12,flexShrink:0}}>
+        <Card style={{marginBottom:14,background:`${C.purple}08`,border:`1px solid ${C.purple}28`}}>
+          <SLabel right={<Badge color={C.purple}>LAB</Badge>}>Policy Simulation Lab</SLabel>
+          <div style={{fontSize:9,color:C.text3,marginBottom:12}}>Set & simulate before publishing</div>
+          {[['REVERSIBILITY FLOOR',rfSim,setRfSim,C.cyan],['RISK TOLERANCE',rtSim,setRtSim,C.orange],['ETHICAL WEIGHT',ewSim,setEwSim,C.green]].map(([l,v,s,c])=>(
+            <div key={l} style={{marginBottom:14}}>
+              <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
+                <span style={{fontSize:8,color:C.text3,...mono}}>{l}</span>
+                <span style={{fontSize:10,color:c,fontWeight:700,...mono}}>{v.toFixed(2)}</span>
+              </div>
+              <input type="range" min={0} max={1} step={0.01} value={v}
+                onChange={e=>s(parseFloat(e.target.value))} style={{width:'100%',accentColor:c}}/>
+            </div>
+          ))}
+          <div style={{padding:11,background:C.card2,borderRadius:5,border:`1px solid ${C.border}`,marginBottom:12}}>
+            <div style={{fontSize:8,color:C.text3,...mono,marginBottom:8}}>SIMULATION OUTPUT</div>
+            {[['Decisions Affected',decAff,C.text1],['Paths Blocked',pathBlocked,C.red],['Projected Quality',projQual,C.green]].map(([l,v,c])=>(
+              <div key={l} style={{display:'flex',justifyContent:'space-between',marginBottom:6}}>
+                <span style={{fontSize:11,color:C.text2}}>{l}</span>
+                <span style={{fontSize:11,fontWeight:700,color:c,...mono}}>{v}</span>
+              </div>
+            ))}
+          </div>
+          <Btn sm primary full>✦ PUBLISH POLICY</Btn>
+        </Card>
+        <Card>
+          <SLabel>Authority Loop</SLabel>
+          {[{label:'Executive',action:'Sets constraints',color:C.cyan},
+            {label:'Operator', action:'Runs decisions',  color:C.orange},
+            {label:'Gov. Kernel',action:'Evaluates outcomes',color:C.purple},
+            {label:'Executive',action:'Adjusts policy',  color:C.cyan}].map((s,i)=>(
+            <div key={i} style={{display:'flex',gap:10,marginBottom:10,alignItems:'flex-start'}}>
+              <div style={{display:'flex',flexDirection:'column',alignItems:'center'}}>
+                <Dot color={s.color}/>
+                {i<3&&<div style={{width:1,height:18,background:`${s.color}35`,marginTop:3}}/>}
+              </div>
+              <div style={{paddingTop:1}}>
+                <span style={{fontSize:11,fontWeight:600,color:s.color}}>{s.label} </span>
+                <span style={{fontSize:11,color:C.text3}}>→ {s.action}</span>
+              </div>
+            </div>
+          ))}
+        </Card>
+      </div>
+    </div>
+  );
+};
+
+// ·· SHELL ··
+const CommandCenter=()=>{
+  const [mode,setMode]=useState('omc');
+  const tabs=[{id:'omc',label:'OMC',sub:'Operator'},{id:'emc',label:'EMC',sub:'Executive'},{id:'gk',label:'GK',sub:'Governance'}];
+  const modeLabel={omc:'OPERATOR MISSION CONTROL',emc:'EXECUTIVE MISSION CONTROL',gk:'GOVERNANCE KERNEL'};
+  const modeColor={omc:C.orange,emc:C.cyan,gk:C.purple};
+  return(
+    <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
+      <div style={{padding:'0 20px',borderBottom:`1px solid ${C.border}`,display:'flex',alignItems:'center',background:C.card2,flexShrink:0}}>
+        {tabs.map(t=>(
+          <div key={t.id} onClick={()=>setMode(t.id)} style={{padding:'10px 20px',cursor:'pointer',marginBottom:-1,transition:'all 0.12s',borderBottom:`2px solid ${mode===t.id?C.orange:'transparent'}`}}>
+            <div style={{fontSize:12,fontWeight:700,...mono,color:mode===t.id?C.orange:C.text2}}>{t.label}</div>
+            <div style={{fontSize:9,color:C.text3}}>{t.sub}</div>
+          </div>
+        ))}
+        <div style={{padding:'6px 16px',borderLeft:`1px solid ${C.border}`,marginLeft:4}}>
+          <div style={{fontSize:9,color:C.text3,...mono}}>— TOOLS</div>
+        </div>
+        <div style={{flex:1}}/>
+        <div style={{padding:'6px 14px',background:`${modeColor[mode]}14`,border:`1px solid ${modeColor[mode]}44`,borderRadius:4,display:'flex',alignItems:'center',gap:7}}>
+          <Dot color={modeColor[mode]} pulse/>
+          <span style={{fontSize:9,color:modeColor[mode],fontWeight:700,...mono}}>{modeLabel[mode]}</span>
+        </div>
+      </div>
+      <div style={{flex:1,overflow:'hidden'}}>
+        {mode==='omc'&&<OperatorControl/>}
+        {mode==='emc'&&<ExecutiveControl/>}
+        {mode==='gk' &&<GovernanceKernel/>}
+      </div>
+    </div>
+  );
+};
+
+// ── APP ────────────────────────────────────────────────────────────────────
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "accentColor": "#ff5500",
+  "secondaryColor": "#00d4b4",
+  "density": "comfortable"
+}/*EDITMODE-END*/;
+
+const SCREENS  = {wizard:DecisionWizard,mission:MissionControl,theater:DecisionTheater,log:DecisionLog,intel:Intelligence,govern:Governance,workspace:Workspace,command:CommandCenter};
+const TITLES   = {wizard:'Decision Wizard',mission:'Mission Control',theater:'Decision Theater',log:'Decision Log',intel:'System Intelligence',govern:'Governance',workspace:'Workspace',command:'Command Center'};
+const CRUMBS   = {wizard:'Step-by-step decision onboarding',mission:'Attention Engine · JUDGE phase active',theater:'Simulate → Stress → Judge',log:'DB_SYNC: ACTIVE [0x9212]',intel:'S1 · S2 · S3 Cognitive Layers',govern:'Executive Governance Layer',workspace:'Human · AI · Agent Collaboration Layer',command:'OMC · EMC · GK Authority Layers'};
+
+const App = () => {
+  const [screen, setScreen] = useState(()=>localStorage.getItem('delphi_screen')||'mission');
+  const [tweakUI, setTweakUI] = useState(false);
+  const [tweaks, setTweaks] = useState(TWEAK_DEFAULTS);
+
+  useEffect(()=>{ localStorage.setItem('delphi_screen',screen); },[screen]);
+
+  useEffect(()=>{
+    const handler = e => {
+      if(e.data?.type==='__activate_edit_mode') setTweakUI(true);
+      if(e.data?.type==='__deactivate_edit_mode') setTweakUI(false);
+    };
+    window.addEventListener('message',handler);
+    window.parent.postMessage({type:'__edit_mode_available'},'*');
+    return ()=>window.removeEventListener('message',handler);
+  },[]);
+
+  const ActiveScreen = SCREENS[screen];
+
+  return (
+    <div style={{display:'flex',width:'100vw',height:'100vh',background:C.bg,overflow:'hidden'}}>
+      <Sidebar active={screen} onNav={setScreen}/>
+      <div style={{flex:1,display:'flex',flexDirection:'column',minWidth:0}}>
+        <Topbar title={TITLES[screen]} crumb={CRUMBS[screen]}/>
+        <div style={{flex:1,overflow:'hidden'}}>
+          <ActiveScreen/>
+        </div>
+      </div>
+
+      {tweakUI && (
+        <div style={{position:'fixed',bottom:18,right:18,background:C.card2,border:`1px solid ${C.border2}`,
+          borderRadius:8,padding:18,width:240,zIndex:9999,boxShadow:'0 12px 40px rgba(0,0,0,0.6)'}}>
+          <div style={{fontWeight:700,marginBottom:14,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+            <span>Tweaks</span>
+            <span onClick={()=>setTweakUI(false)} style={{cursor:'pointer',color:C.text3,fontSize:14}}>✕</span>
+          </div>
+          <div style={{marginBottom:14}}>
+            <div style={{fontSize:9,color:C.text3,...mono,marginBottom:6}}>ACCENT COLOR</div>
+            <input type="color" value={tweaks.accentColor} onChange={e=>{
+              const v={...tweaks,accentColor:e.target.value};
+              setTweaks(v);
+              window.parent.postMessage({type:'__edit_mode_set_keys',edits:v},'*');
+            }} style={{width:'100%',height:30,border:'none',borderRadius:4,cursor:'pointer',background:'transparent'}}/>
+          </div>
+          <div style={{marginBottom:14}}>
+            <div style={{fontSize:9,color:C.text3,...mono,marginBottom:6}}>SECONDARY COLOR</div>
+            <input type="color" value={tweaks.secondaryColor} onChange={e=>{
+              const v={...tweaks,secondaryColor:e.target.value};
+              setTweaks(v);
+              window.parent.postMessage({type:'__edit_mode_set_keys',edits:v},'*');
+            }} style={{width:'100%',height:30,border:'none',borderRadius:4,cursor:'pointer',background:'transparent'}}/>
+          </div>
+          <div>
+            <div style={{fontSize:9,color:C.text3,...mono,marginBottom:6}}>DENSITY</div>
+            {['compact','comfortable','spacious'].map(d=>(
+              <label key={d} style={{display:'flex',alignItems:'center',gap:8,marginBottom:5,cursor:'pointer'}}>
+                <input type="radio" name="density" checked={tweaks.density===d}
+                  onChange={()=>{const v={...tweaks,density:d};setTweaks(v);window.parent.postMessage({type:'__edit_mode_set_keys',edits:v},'*');}}/>
+                <span style={{fontSize:12,color:C.text2,textTransform:'capitalize'}}>{d}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
