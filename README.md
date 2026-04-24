@@ -1,25 +1,44 @@
-# CODING AGENTS: READ THIS FIRST
+# Delphi Decision Platform (Rust)
 
-This is a **handoff bundle** from Claude Design (claude.ai/design).
+Rust-first microservices and gateway for Delphi:
 
-A user mocked up designs in HTML/CSS/JS using an AI design tool, then exported this bundle so a coding agent can implement the designs for real.
+Services:
+- `gravity-svc`
+- `authority-svc`
+- `autonomy-svc`
+- `policy-svc`
+- `gateway-svc`
 
-## What you should do — IMPORTANT
+The gateway gives Delphi **one endpoint** to call:
+- `POST /v1/decision/evaluate`
 
-**Read the chat transcripts first.** There are 1 chat transcript(s) in `chats/`. The transcripts show the full back-and-forth between the user and the design assistant — they tell you **what the user actually wants** and **where they landed** after iterating. Don't skip them. The final HTML files are the output, but the chat is where the intent lives.
+That endpoint orchestrates:
+1. policy lookup
+2. gravity scoring
+3. authority evaluation
+4. autonomy routing
 
-**Read `project/Delphi.html` in full.** The user had this file open when they triggered the handoff, so it's almost certainly the primary design they want built. Read it top to bottom — don't skim. Then **follow its imports**: open every file it pulls in (shared components, CSS, scripts) so you understand how the pieces fit together before you start implementing.
+## Run individual services
 
-**If anything is ambiguous, ask the user to confirm before you start implementing.** It's much cheaper to clarify scope up front than to build the wrong thing.
+```bash
+cargo run -p policy-svc
+cargo run -p gravity-svc
+cargo run -p authority-svc
+cargo run -p autonomy-svc
+cargo run -p gateway-svc
+```
 
-## About the design files
+Ports:
+- policy-svc: 8010
+- gravity-svc: 8011
+- authority-svc: 8012
+- autonomy-svc: 8013
+- gateway-svc: 8014
 
-The design medium is **HTML/CSS/JS** — these are prototypes, not production code. Your job is to **recreate them pixel-perfectly** in whatever technology makes sense for the target codebase (React, Vue, native, whatever fits). Match the visual output; don't copy the prototype's internal structure unless it happens to fit.
+## Example
 
-**Don't render these files in a browser or take screenshots unless the user asks you to.** Everything you need — dimensions, colors, layout rules — is spelled out in the source. Read the HTML and CSS directly; a screenshot won't tell you anything they don't.
-
-## Bundle contents
-
-- `README.md` — this file
-- `chats/` — conversation transcripts (read these!)
-- `project/` — the `Delphi Oracle - Decision Intelligence` project files (HTML prototypes, assets, components)
+```bash
+curl -X POST http://127.0.0.1:8014/v1/decision/evaluate \
+  -H "Content-Type: application/json" \
+  -d @examples/gateway-request.json
+```

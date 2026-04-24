@@ -1,0 +1,20 @@
+{
+  "decision_id": "decision_123",
+  "confidence": 0.74,
+  "reversibility": 0.82,
+  "trust": 0.78,
+  "authority_factor": 0.60,
+  "gravity": 0.76,
+  "base_threshold": 0.70,
+  "threshold_modifiers": {
+    "regulated_domain": 1.0,
+    "after_hours": 1.0,
+    "incident_mode": 1.0
+  },
+  "current_actor_authority": "manager",
+  "required_authority": "manager",
+  "ethical_flag": false,
+  "regulated_domain": false,
+  "irreversible_action": false,
+  "visibility": 0.4
+}

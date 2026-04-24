@@ -1,0 +1,36 @@
+use serde::{Deserialize, Serialize};
+use crate::{policy::PolicyResponse, gravity::GravityResponse, authority::AuthorityResponse, autonomy::AutonomyResponse};
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct GatewayRequest {
+    pub decision_id: String,
+    pub domain: String,
+    pub decision_type: String,
+    pub current_actor_authority: String,
+
+    pub impact: f64,
+    pub urgency: f64,
+    pub uncertainty: f64,
+    pub irreversibility: f64,
+    pub visibility: f64,
+
+    pub confidence: f64,
+    pub reversibility: f64,
+    pub trust: f64,
+    pub cost_exposure: f64,
+
+    pub ethical_flag: bool,
+    pub regulated_domain: bool,
+    pub irreversible_action: bool,
+    pub after_hours: bool,
+    pub incident_mode: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct GatewayResponse {
+    pub decision_id: String,
+    pub policy: PolicyResponse,
+    pub gravity: GravityResponse,
+    pub authority: AuthorityResponse,
+    pub autonomy: AutonomyResponse,
+}

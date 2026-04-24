@@ -1,0 +1,8 @@
+{
+  "decision_id": "decision_123",
+  "impact": 0.9,
+  "urgency": 0.7,
+  "uncertainty": 0.6,
+  "irreversibility": 0.8,
+  "visibility": 0.4
+}

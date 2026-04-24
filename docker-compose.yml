@@ -1,0 +1,46 @@
+version: "3.9"
+services:
+  policy-svc:
+    image: rust:1.81
+    working_dir: /app
+    volumes:
+      - .:/app
+    command: bash -lc "cargo run -p policy-svc"
+    ports: ["8010:8010"]
+
+  gravity-svc:
+    image: rust:1.81
+    working_dir: /app
+    volumes:
+      - .:/app
+    command: bash -lc "cargo run -p gravity-svc"
+    ports: ["8011:8011"]
+
+  authority-svc:
+    image: rust:1.81
+    working_dir: /app
+    volumes:
+      - .:/app
+    command: bash -lc "cargo run -p authority-svc"
+    ports: ["8012:8012"]
+
+  autonomy-svc:
+    image: rust:1.81
+    working_dir: /app
+    volumes:
+      - .:/app
+    command: bash -lc "cargo run -p autonomy-svc"
+    ports: ["8013:8013"]
+
+  gateway-svc:
+    image: rust:1.81
+    working_dir: /app
+    volumes:
+      - .:/app
+    command: bash -lc "cargo run -p gateway-svc"
+    ports: ["8014:8014"]
+    depends_on:
+      - policy-svc
+      - gravity-svc
+      - authority-svc
+      - autonomy-svc

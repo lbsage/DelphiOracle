@@ -1,0 +1,10 @@
+{
+  "decision_id": "decision_123",
+  "domain": "product_launch",
+  "decision_type": "operational",
+  "gravity_band": "high",
+  "cost_exposure": 500000,
+  "current_actor_authority": "operator",
+  "ethical_flag": false,
+  "regulated_domain": false
+}

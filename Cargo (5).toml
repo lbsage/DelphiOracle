@@ -1,0 +1,23 @@
+{
+  "decision_id": "decision_123",
+  "domain": "product_launch",
+  "decision_type": "operational",
+  "current_actor_authority": "manager",
+
+  "impact": 0.9,
+  "urgency": 0.7,
+  "uncertainty": 0.6,
+  "irreversibility": 0.8,
+  "visibility": 0.4,
+
+  "confidence": 0.74,
+  "reversibility": 0.82,
+  "trust": 0.78,
+  "cost_exposure": 500000,
+
+  "ethical_flag": false,
+  "regulated_domain": false,
+  "irreversible_action": false,
+  "after_hours": false,
+  "incident_mode": false
+}
