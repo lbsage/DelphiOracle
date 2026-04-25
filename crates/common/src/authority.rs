@@ -26,47 +26,59 @@ pub struct AuthorityResponse {
 }
 
 pub fn authority_factor(level: &str) -> f64 {
-    match level { "operator" => 0.35, "manager" => 0.60, "executive" => 0.90, _ => 0.0 }
+    match level {
+        "operator"  => 0.35,
+        "manager"   => 0.60,
+        "executive" => 0.90,
+        _           => 0.0,
+    }
 }
 
 fn escalation_target(level: &str) -> Option<String> {
     match level {
         "operator" => Some("manager_on_call".to_string()),
-        "manager" => Some("executive_sponsor".to_string()),
-        _ => None,
+        "manager"  => Some("executive_sponsor".to_string()),
+        _          => None,
     }
 }
 
 pub fn determine_required_authority(req: &AuthorityRequest) -> &'static str {
     if req.ethical_flag { return "executive"; }
-    if req.regulated_domain && (req.gravity_band == "medium" || req.gravity_band == "high") { return "executive"; }
-    if req.gravity_band == "high" { return "executive"; }
+    if req.regulated_domain && matches!(req.gravity_band.as_str(), "medium" | "high") {
+        return "executive";
+    }
+    if req.gravity_band == "high"   { return "executive"; }
     if req.gravity_band == "medium" { return "manager"; }
     if req.cost_exposure >= 250_000.0 { return "manager"; }
     "operator"
 }
 
 pub fn evaluate(req: AuthorityRequest) -> AuthorityResponse {
-    let required = determine_required_authority(&req).to_string();
-    let current = req.current_actor_authority.clone();
-    let current_factor = authority_factor(&current);
+    let required        = determine_required_authority(&req).to_string();
+    let current         = req.current_actor_authority.clone();
+    let current_factor  = authority_factor(&current);
     let required_factor = authority_factor(&required);
 
     let mut reason_codes = Vec::new();
-    if req.ethical_flag { reason_codes.push("ETHICAL_REVIEW_REQUIRED".to_string()); }
-    if req.regulated_domain { reason_codes.push("REGULATED_DOMAIN".to_string()); }
-    if req.gravity_band == "high" { reason_codes.push("HIGH_GRAVITY".to_string()); }
+    if req.ethical_flag              { reason_codes.push("ETHICAL_REVIEW_REQUIRED".to_string()); }
+    if req.regulated_domain          { reason_codes.push("REGULATED_DOMAIN".to_string()); }
+    if req.gravity_band == "high"    { reason_codes.push("HIGH_GRAVITY".to_string()); }
     if req.cost_exposure >= 250_000.0 { reason_codes.push("HIGH_COST_EXPOSURE".to_string()); }
+    if reason_codes.is_empty()       { reason_codes.push("WITHIN_STANDARD_AUTHORITY".to_string()); }
 
-    let can_auto_execute = current_factor >= required_factor && required != "executive";
-    let escalation_target = if current_factor >= required_factor { None } else { escalation_target(&current) };
+    let can_auto_execute   = current_factor >= required_factor && required != "executive";
+    let escalation_target  = if current_factor < required_factor {
+        escalation_target(&current)
+    } else {
+        None
+    };
 
     let explanation = if current_factor < required_factor {
         format!("Decision exceeds {current} authority and requires {required} review.")
     } else if can_auto_execute {
         format!("Decision is within {current} authority and may proceed to autonomy evaluation.")
     } else {
-        format!("Decision remains within {required} governance scope but is not auto-executable by policy.")
+        format!("Decision is within {required} governance scope but is not auto-executable by policy.")
     };
 
     AuthorityResponse {
@@ -77,7 +89,7 @@ pub fn evaluate(req: AuthorityRequest) -> AuthorityResponse {
         required_authority_factor: required_factor,
         can_auto_execute,
         escalation_target,
-        reason_codes: if reason_codes.is_empty() { vec!["WITHIN_STANDARD_AUTHORITY".to_string()] } else { reason_codes },
+        reason_codes,
         explanation,
     }
 }

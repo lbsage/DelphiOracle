@@ -1,46 +1,57 @@
 version: "3.9"
+
+# ── Delphi Decision Engine — Rust Microservices ───────────────────────────
+# Run all services:  docker compose up
+# Run one service:   docker compose up gateway-svc
+# Test gateway:      curl -X POST http://localhost:8014/evaluate \
+#                      -H 'Content-Type: application/json' \
+#                      -d @examples/gateway-request.json | jq
+
+x-rust-base: &rust-base
+  image: rust:1.81-slim
+  working_dir: /app
+  volumes:
+    - .:/app
+    - cargo-cache:/usr/local/cargo/registry
+    - target-cache:/app/target
+
 services:
   policy-svc:
-    image: rust:1.81
-    working_dir: /app
-    volumes:
-      - .:/app
-    command: bash -lc "cargo run -p policy-svc"
+    <<: *rust-base
+    command: cargo run -p policy-svc
     ports: ["8010:8010"]
+    environment:
+      RUST_LOG: info
 
   gravity-svc:
-    image: rust:1.81
-    working_dir: /app
-    volumes:
-      - .:/app
-    command: bash -lc "cargo run -p gravity-svc"
+    <<: *rust-base
+    command: cargo run -p gravity-svc
     ports: ["8011:8011"]
+    environment:
+      RUST_LOG: info
 
   authority-svc:
-    image: rust:1.81
-    working_dir: /app
-    volumes:
-      - .:/app
-    command: bash -lc "cargo run -p authority-svc"
+    <<: *rust-base
+    command: cargo run -p authority-svc
     ports: ["8012:8012"]
+    environment:
+      RUST_LOG: info
 
   autonomy-svc:
-    image: rust:1.81
-    working_dir: /app
-    volumes:
-      - .:/app
-    command: bash -lc "cargo run -p autonomy-svc"
+    <<: *rust-base
+    command: cargo run -p autonomy-svc
     ports: ["8013:8013"]
+    environment:
+      RUST_LOG: info
 
   gateway-svc:
-    image: rust:1.81
-    working_dir: /app
-    volumes:
-      - .:/app
-    command: bash -lc "cargo run -p gateway-svc"
+    <<: *rust-base
+    command: cargo run -p gateway-svc
     ports: ["8014:8014"]
-    depends_on:
-      - policy-svc
-      - gravity-svc
-      - authority-svc
-      - autonomy-svc
+    environment:
+      RUST_LOG: info
+    # gateway calls common library directly — no network deps on other services
+
+volumes:
+  cargo-cache:
+  target-cache:

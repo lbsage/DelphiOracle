@@ -17,3 +17,7 @@
 .DS_Store
 *.pem
 npm-debug.log*
+
+# rust
+/target
+Cargo.lock

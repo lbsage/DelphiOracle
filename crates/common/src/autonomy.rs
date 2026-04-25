@@ -1,15 +1,5 @@
 use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct ThresholdModifiers {
-    pub regulated_domain: f64,
-    pub after_hours: f64,
-    pub incident_mode: f64,
-}
-
-impl Default for ThresholdModifiers {
-    fn default() -> Self { Self { regulated_domain: 1.0, after_hours: 1.0, incident_mode: 1.0 } }
-}
+use crate::policy::ThresholdModifiers; // reuse — no duplication
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AutonomyRequest {
@@ -53,21 +43,29 @@ pub fn effective_threshold(req: &AutonomyRequest) -> f64 {
 }
 
 pub fn compute_autonomy_score(req: &AutonomyRequest) -> f64 {
-    let score = (req.confidence * req.reversibility * req.trust * req.authority_factor) / req.gravity.max(0.05);
+    // High gravity suppresses autonomous execution; high confidence/reversibility/trust lifts it.
+    let score = (req.confidence * req.reversibility * req.trust * req.authority_factor)
+        / req.gravity.max(0.05);
     (score.min(2.0) * 10_000.0).round() / 10_000.0
 }
 
 fn hard_block(req: &AutonomyRequest) -> Vec<String> {
     let mut reasons = Vec::new();
-    if req.ethical_flag { reasons.push("ETHICAL_REVIEW_REQUIRED".to_string()); }
-    if req.regulated_domain && req.irreversible_action { reasons.push("REGULATED_IRREVERSIBLE_ACTION".to_string()); }
-    if req.gravity > 0.85 && req.irreversible_action { reasons.push("HIGH_GRAVITY_IRREVERSIBLE_ACTION".to_string()); }
+    if req.ethical_flag {
+        reasons.push("ETHICAL_REVIEW_REQUIRED".to_string());
+    }
+    if req.regulated_domain && req.irreversible_action {
+        reasons.push("REGULATED_IRREVERSIBLE_ACTION".to_string());
+    }
+    if req.gravity > 0.85 && req.irreversible_action {
+        reasons.push("HIGH_GRAVITY_IRREVERSIBLE_ACTION".to_string());
+    }
     reasons
 }
 
 pub fn evaluate(req: AutonomyRequest) -> AutonomyResponse {
-    let threshold = effective_threshold(&req);
-    let score = compute_autonomy_score(&req);
+    let threshold     = effective_threshold(&req);
+    let score         = compute_autonomy_score(&req);
     let block_reasons = hard_block(&req);
 
     if !block_reasons.is_empty() {
@@ -77,7 +75,7 @@ pub fn evaluate(req: AutonomyRequest) -> AutonomyResponse {
             effective_threshold: threshold,
             route: "BLOCK".to_string(),
             reason_codes: block_reasons,
-            explanation: "Policy blocked autonomous execution due to irreversible or ethically sensitive conditions.".to_string(),
+            explanation: "Policy blocked autonomous execution — irreversible or ethically sensitive action.".to_string(),
         };
     }
 
@@ -99,7 +97,7 @@ pub fn evaluate(req: AutonomyRequest) -> AutonomyResponse {
             effective_threshold: threshold,
             route: "AUTO_EXECUTE".to_string(),
             reason_codes: vec!["SCORE_ABOVE_THRESHOLD".to_string()],
-            explanation: "Decision cleared autonomy threshold and may execute automatically.".to_string(),
+            explanation: "Decision cleared the autonomy threshold and may execute automatically.".to_string(),
         };
     }
 
@@ -109,6 +107,6 @@ pub fn evaluate(req: AutonomyRequest) -> AutonomyResponse {
         effective_threshold: threshold,
         route: "HUMAN_APPROVAL_REQUIRED".to_string(),
         reason_codes: vec!["SCORE_BELOW_THRESHOLD".to_string()],
-        explanation: "Decision did not clear the autonomy threshold and requires approval.".to_string(),
+        explanation: "Decision did not clear the autonomy threshold — human approval required.".to_string(),
     }
 }

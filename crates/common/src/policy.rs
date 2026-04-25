@@ -13,11 +13,19 @@ pub struct PolicyRequest {
     pub gravity_hint: Option<f64>,
 }
 
+/// Shared by both PolicyResponse and AutonomyRequest so modifiers
+/// flow through the pipeline without struct duplication.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ThresholdModifiers {
     pub regulated_domain: f64,
     pub after_hours: f64,
     pub incident_mode: f64,
+}
+
+impl Default for ThresholdModifiers {
+    fn default() -> Self {
+        Self { regulated_domain: 1.0, after_hours: 1.0, incident_mode: 1.0 }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -32,16 +40,16 @@ pub struct PolicyResponse {
 
 pub fn evaluate(req: PolicyRequest) -> PolicyResponse {
     let base_threshold = match req.decision_type.as_str() {
-        "strategic" => 0.85,
-        "financial" => 0.80,
+        "strategic"   => 0.85,
+        "financial"   => 0.80,
         "operational" => 0.70,
-        _ => 0.75,
+        _             => 0.75,
     };
 
     let modifiers = ThresholdModifiers {
         regulated_domain: if req.regulated_domain { 1.15 } else { 1.0 },
-        after_hours: if req.after_hours { 1.05 } else { 1.0 },
-        incident_mode: if req.incident_mode { 0.90 } else { 1.0 },
+        after_hours:      if req.after_hours      { 1.05 } else { 1.0 },
+        incident_mode:    if req.incident_mode    { 0.90 } else { 1.0 },
     };
 
     let mut hard_block_rules = Vec::new();
